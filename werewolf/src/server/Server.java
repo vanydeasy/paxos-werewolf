@@ -27,10 +27,13 @@ public class Server extends Thread {
     public final static int COMM_PORT = 8181;  // socket port for client comms
     private static ServerSocket serverSocket; // server socket
     private static ArrayList<JSONObject> players = new ArrayList<>();
+    private static ArrayList<String> roles = new ArrayList<>();
     private final Socket clientSocket;
     private static int clientCount = 0;
-    private static int playerid = 0;
+    private static int playerCount = 0;
     private static int PLAYER_TO_PLAY;
+    
+    private int player_id;
     
     public Server(Socket clientSocket) {
         this.clientSocket = clientSocket;
@@ -71,7 +74,7 @@ public class Server extends Thread {
             Scanner keyboard = new Scanner(System.in);
             System.out.print("Players amount(>= 6) : ");
             PLAYER_TO_PLAY = keyboard.nextInt();
-        } while(PLAYER_TO_PLAY < 6);        
+        } while(PLAYER_TO_PLAY < 0);        
         
         // Create server socket
         try {
@@ -87,8 +90,6 @@ public class Server extends Thread {
             try {
                 socket = serverSocket.accept();
                 new Server(socket);
-                System.out.println("\nClient Counter: "+ ++clientCount);
-                playerid++;
             } catch (IOException ex) {
                 Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -101,29 +102,57 @@ public class Server extends Thread {
         JSONObject jsonRecv;
         do {
             Object recv = listen(clientSocket);
-            System.out.println(recv);
             jsonRecv = (JSONObject)recv;
+            
+            JSONObject temp = new JSONObject();
             if(jsonRecv.get("method").equals("join")) {
-                JSONObject temp = new JSONObject();
                 temp.put("username", jsonRecv.get("username"));
-                temp.put("player_id", playerid);
+                player_id = playerCount;
+                temp.put("player_id", player_id);
                 send(clientSocket, temp);
                 temp.put("is_alive", 1);
                 temp.put("address",clientSocket.getInetAddress().toString());
                 temp.put("port",clientSocket.getPort());
                 players.add(temp);
+                if(playerCount%3 == 0) {
+                    roles.add(playerCount, "werewolf");
+                }
+                else {
+                    roles.add(playerCount, "civilian");
+                }
+                System.out.println("\nClient Counter: "+ ++clientCount);
+                ++playerCount;
             }
             else if(jsonRecv.get("method").equals("ready")) {
-                JSONObject temp = new JSONObject();
                 temp.put("status","ok");
-                if(PLAYER_TO_PLAY < clientCount) {
+                if(PLAYER_TO_PLAY > clientCount) {
                     temp.put("play", 0);
+                    temp.put("player",clientCount);
                     temp.put("description","waiting for other player to start");
                 }
                 else {
                     temp.put("play", 1);
+                    temp.put("player",clientCount);
                     temp.put("description","ready to start");
+                    
                 }
+                send(clientSocket, temp);
+                
+                while(PLAYER_TO_PLAY > clientCount){
+                    System.out.print("");
+                }
+                
+                temp.clear();
+                temp.put("method","start");
+                temp.put("time", "day");
+                temp.put("description", "game is started");
+                temp.put("role",roles.get(player_id));
+                send(clientSocket, temp);
+            }
+            else if(jsonRecv.get("method").equals("client_address")) {
+                while(PLAYER_TO_PLAY > clientCount);
+                temp.put("status", "ok");
+                temp.put("clients", players.toString());
                 send(clientSocket, temp);
             }
         } while(!jsonRecv.get("method").equals("leave"));
@@ -131,9 +160,9 @@ public class Server extends Thread {
         JSONObject leave = new JSONObject();
         leave.put("status", "ok");
         send(clientSocket, leave);
-        int i = 0;
+        
         for(JSONObject p: players) {
-            if((Integer)p.get("player_id") == playerid) {
+            if((Integer)p.get("player_id") == playerCount) {
                 p = null;
             }
         }

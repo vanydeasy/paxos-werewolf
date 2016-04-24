@@ -30,6 +30,8 @@ public class Client {
     private Socket socket;
     
     private int player_id;
+    private String role;
+    
     
     public Client() {
         SERVER_HOSTNAME = "127.0.1.1";
@@ -90,12 +92,13 @@ public class Client {
         
         obj = (JSONObject)listenToServer();
         player_id = (Integer)obj.get("player_id");
-        obj = new JSONObject();
+        obj.clear();
         obj.put("method","ready");
         sendToServer(obj);
         obj = (JSONObject)listenToServer();
         if(obj.get("status").equals("ok")) {
-            System.out.println(obj.get("description"));
+            role = (String)((JSONObject)listenToServer()).get("role");
+            System.out.println("YOUR ROLE IS "+role);
         }
         else {
             
@@ -126,8 +129,8 @@ public class Client {
         String username = keyboard.nextLine();
         client.joinGame(username);
         
+        while(true);
         
-        
-        client.leaveGame();
+        //client.leaveGame();
     }
 }
