@@ -14,9 +14,12 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
 /**
@@ -114,12 +117,7 @@ public class Server extends Thread {
                 temp.put("address",clientSocket.getInetAddress().toString());
                 temp.put("port",clientSocket.getPort());
                 players.add(temp);
-                if(playerCount%3 == 0) {
-                    roles.add(playerCount, "werewolf");
-                }
-                else {
-                    roles.add(playerCount, "civilian");
-                }
+                randomizeRole(player_id);
                 System.out.println("\nClient Counter: "+ ++clientCount);
                 ++playerCount;
             }
@@ -152,7 +150,9 @@ public class Server extends Thread {
             else if(jsonRecv.get("method").equals("client_address")) {
                 while(PLAYER_TO_PLAY > clientCount);
                 temp.put("status", "ok");
-                temp.put("clients", players.toString());
+                JSONArray playerJSON = new JSONArray();
+                playerJSON.addAll(players);
+                temp.put("clients", playerJSON);
                 send(clientSocket, temp);
             }
         } while(!jsonRecv.get("method").equals("leave"));
@@ -168,5 +168,18 @@ public class Server extends Thread {
         }
         System.out.println("\nCommunication Thread Stopped. Client leave!");
         System.out.println("Client Counter: "+ --clientCount);
+    }
+    
+    public void randomizeRole(int player_id) {
+        if(Collections.frequency(roles, "werewolf") == 0) {
+            roles.add(player_id, "werewolf");
+        }
+        else if((float)Collections.frequency(roles,"werewolf")/(float)PLAYER_TO_PLAY >= 1.00/3.00) {
+            roles.add(player_id, "civilian");
+        }
+        else {
+            Random rand = new Random();
+            roles.add(player_id, rand.nextBoolean() ? "werewolf":"civilian");
+        }
     }
 }

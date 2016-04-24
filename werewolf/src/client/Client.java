@@ -13,9 +13,11 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.json.simple.JSONArray;
 import server.Server;
 import org.json.simple.JSONObject;
 
@@ -31,7 +33,7 @@ public class Client {
     
     private int player_id;
     private String role;
-    
+    private JSONArray players = new JSONArray();
     
     public Client() {
         SERVER_HOSTNAME = "127.0.1.1";
@@ -85,24 +87,36 @@ public class Client {
     }
     
     public void joinGame(String username) {
+        // Mengirim username ke server
         JSONObject obj = new JSONObject();
         obj.put("username", username);
         obj.put("method","join");
         sendToServer(obj);
         
+        // Mendapatkan player id dari server
         obj = (JSONObject)listenToServer();
         player_id = (Integer)obj.get("player_id");
         obj.clear();
+        
+        // Mengirim ready ke user
         obj.put("method","ready");
         sendToServer(obj);
+        
+        // Mendapatkan status dari server = ok
         obj = (JSONObject)listenToServer();
         if(obj.get("status").equals("ok")) {
+            // Mendapatkan role dari server saat player sudah cukup
             role = (String)((JSONObject)listenToServer()).get("role");
             System.out.println("YOUR ROLE IS "+role);
         }
-        else {
-            
-        }
+        
+        // Meminta address semua klien dari server
+        obj.clear();
+        obj.put("method", "client_address");
+        sendToServer(obj);
+        
+        // Menerima address semua klien dari server
+        players = (JSONArray)((JSONObject)listenToServer()).get("clients");
     }
     
     public void leaveGame() {
@@ -128,9 +142,10 @@ public class Client {
         System.out.print("Username: ");
         String username = keyboard.nextLine();
         client.joinGame(username);
+
+        // GAME PLAY HERE
         
-        while(true);
         
-        //client.leaveGame();
+        client.leaveGame();
     }
 }
