@@ -43,35 +43,6 @@ public class Server extends Thread {
         start();
     }
     
-    public static Object listen(Socket socket) {
-        Object object = null;
-        try {
-            InputStream iStream = socket.getInputStream();
-            ObjectInputStream oiStream = new ObjectInputStream(iStream);
-            object = (Object) oiStream.readObject();
-            System.out.println("\nServer received: "+object.toString()+" from: "+socket);
-        } catch (IOException | ClassNotFoundException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return object;
-    }
-    
-    // send object to socket
-    public static boolean send(Socket socket, Object object) {
-        OutputStream oStream;
-        try {
-            oStream = socket.getOutputStream();
-            ObjectOutputStream ooStream = new ObjectOutputStream(oStream);
-            ooStream.writeObject(object);  // send serialized
-        } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-            System.out.println("Client "+socket+" has disconnected");
-            return false;
-        }
-        System.out.println("\nServer send: "+object.toString());
-        return true;
-    }
-    
     public static void main(String[] args) {
         do {
             Scanner keyboard = new Scanner(System.in);
@@ -109,17 +80,31 @@ public class Server extends Thread {
             
             JSONObject temp = new JSONObject();
             if(jsonRecv.get("method").equals("join")) {
-                temp.put("username", jsonRecv.get("username"));
-                player_id = playerCount;
-                temp.put("player_id", player_id);
-                send(clientSocket, temp);
-                temp.put("is_alive", 1);
-                temp.put("address",clientSocket.getInetAddress().toString());
-                temp.put("port",clientSocket.getPort());
-                players.add(temp);
-                randomizeRole(player_id);
-                System.out.println("\nClient Counter: "+ ++clientCount);
-                ++playerCount;
+                if(PLAYER_TO_PLAY > playerCount) {
+                    if(!isUsernameExist((String)jsonRecv.get("username"))) {
+                        temp.put("username", jsonRecv.get("username"));
+                        player_id = playerCount;
+                        temp.put("player_id", player_id);
+                        send(clientSocket, temp);
+                        temp.put("is_alive", 1);
+                        temp.put("address",clientSocket.getInetAddress().toString());
+                        temp.put("port",clientSocket.getPort());
+                        players.add(temp);
+                        randomizeRole(player_id);
+                        System.out.println("\nClient Counter: "+ ++clientCount);
+                        ++playerCount;
+                    }
+                    else {
+                        temp.put("status", "fail");
+                        temp.put("description", "user exists");
+                        send(clientSocket, temp);
+                    }
+                }
+                else {
+                    temp.put("status","fail");
+                    temp.put("description", "please wait, game is currently running");
+                    System.out.println("\nClient Counter: "+ ++clientCount);
+                }
             }
             else if(jsonRecv.get("method").equals("ready")) {
                 temp.put("status","ok");
@@ -170,6 +155,35 @@ public class Server extends Thread {
         System.out.println("Client Counter: "+ --clientCount);
     }
     
+    public static Object listen(Socket socket) {
+        Object object = null;
+        try {
+            InputStream iStream = socket.getInputStream();
+            ObjectInputStream oiStream = new ObjectInputStream(iStream);
+            object = (Object) oiStream.readObject();
+            System.out.println("\nServer received: "+object.toString()+" from: "+socket);
+        } catch (IOException | ClassNotFoundException ex) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return object;
+    }
+    
+    // send object to socket
+    public static boolean send(Socket socket, Object object) {
+        OutputStream oStream;
+        try {
+            oStream = socket.getOutputStream();
+            ObjectOutputStream ooStream = new ObjectOutputStream(oStream);
+            ooStream.writeObject(object);  // send serialized
+        } catch (IOException ex) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+            System.out.println("Client "+socket+" has disconnected");
+            return false;
+        }
+        System.out.println("\nServer send: "+object.toString());
+        return true;
+    }
+        
     public void randomizeRole(int player_id) {
         if(Collections.frequency(roles, "werewolf") == 0) {
             roles.add(player_id, "werewolf");
@@ -181,5 +195,14 @@ public class Server extends Thread {
             Random rand = new Random();
             roles.add(player_id, rand.nextBoolean() ? "werewolf":"civilian");
         }
+    }
+    
+    public Boolean isUsernameExist(String username) {
+        for(JSONObject temp : players) {
+            if(temp.get("username").equals(username)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

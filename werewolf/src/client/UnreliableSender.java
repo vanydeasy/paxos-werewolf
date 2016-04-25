@@ -20,9 +20,9 @@ public class UnreliableSender
         random = new Random();
     }
 
-    public void send(DatagramPacket packet) throws IOException {
+    public void send(DatagramPacket packet, double fault) throws IOException {
         double rand = random.nextDouble();
-        if (rand < 0.85) {
+        if (rand < fault) {
                 datagramSocket.send(packet);
         }
     }

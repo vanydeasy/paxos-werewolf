@@ -5,13 +5,18 @@
  */
 package client;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Scanner;
@@ -43,6 +48,68 @@ public class Client {
     public Client(String host, int port) {
         SERVER_HOSTNAME = host;
         COMM_PORT = port;
+    }
+    
+    public static void main(String[] args) {
+        Client client = new Client();
+        client.connectToServer();
+        System.out.println(client.socket);
+        
+        // Get username from user
+        client.joinGame();
+
+        // GAME PLAY HERE
+        if(client.players.size() > 2) {
+            int listenPort = 9876;
+            
+            if(client.player_id == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
+                || client.player_id == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
+                // PROPOSER pid dua terbesar (player ke n dan n­1) 
+                try {
+                    System.out.println("You can propose");
+                    BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
+                    
+                    DatagramSocket datagramSocket = new DatagramSocket();
+                    UnreliableSender unreliableSender = new UnreliableSender(datagramSocket);
+                    JSONObject sent = new JSONObject();
+                    sent.put("method", "prepare_proposal");
+                    sent.put("proposal_id", "(1,"+client.player_id+")");
+                    byte[] sendData = sent.toJSONString().getBytes();
+                    for(int i=0;i<client.players.size();i++) {
+                        String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
+                        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress.substring(1)), listenPort);
+                        unreliableSender.send(sendPacket, 1.00);
+                    }
+                } catch (SocketException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (UnknownHostException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                
+            } else {
+                // ACCEPTOR
+                try {
+                    System.out.println("You cannot propose");
+                    byte[] receiveData = new byte[1024];
+                    
+                    DatagramSocket serverSocket = new DatagramSocket(listenPort);
+                    DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+                    for(int i=0;i<2;i++) {
+                        serverSocket.receive(receivePacket);
+                        String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
+                        System.out.println(sentence);
+                    }
+                } catch (SocketException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+        
+        client.leaveGame();
     }
     
     public void connectToServer() { // Connect client to server (binding)
@@ -86,15 +153,22 @@ public class Client {
         }
     }
     
-    public void joinGame(String username) {
-        // Mengirim username ke server
+    public void joinGame() {
         JSONObject obj = new JSONObject();
-        obj.put("username", username);
-        obj.put("method","join");
-        sendToServer(obj);
-        
-        // Mendapatkan player id dari server
-        obj = (JSONObject)listenToServer();
+        do {
+            Scanner keyboard = new Scanner(System.in);
+            System.out.print("Username: ");
+            String username = keyboard.nextLine();
+            // Mengirim username ke server
+            obj.put("username", username);
+            obj.put("method","join");
+            sendToServer(obj);
+
+            obj = (JSONObject)listenToServer();
+            if(obj.get("status")==null) break;
+        } while(obj.get("status").equals("fail"));
+
+         // Mendapatkan player id dari server
         player_id = (Integer)obj.get("player_id");
         obj.clear();
         
@@ -132,20 +206,4 @@ public class Client {
         } while(!recv.get("status").equals("ok"));
     }
     
-    public static void main(String[] args) {
-        Client client = new Client();
-        client.connectToServer();
-        System.out.println(client.socket);
-        
-        // Get username from user
-        Scanner keyboard = new Scanner(System.in);
-        System.out.print("Username: ");
-        String username = keyboard.nextLine();
-        client.joinGame(username);
-
-        // GAME PLAY HERE
-        
-        
-        client.leaveGame();
-    }
 }
