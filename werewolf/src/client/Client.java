@@ -5,10 +5,8 @@
  */
 package client;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
@@ -18,7 +16,6 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,8 +28,13 @@ import org.json.simple.JSONObject;
  * @author vanyadeasy
  */
 public class Client {
+    // FOR TCP CONNECTION
     public String SERVER_HOSTNAME;
     public int COMM_PORT;  // socket port for client comms
+    
+    // FOR UDP CONNECTION
+    public String UDP_SERVER_HOSTNAME;
+    public int UDP_COMM_PORT;
     
     private Socket socket;
     
@@ -60,14 +62,11 @@ public class Client {
 
         // GAME PLAY HERE
         if(client.players.size() > 2) {
-            int listenPort = 9876;
-            
             if(client.player_id == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
                 || client.player_id == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
                 // PROPOSER pid dua terbesar (player ke n dan n­1) 
                 try {
                     System.out.println("You can propose");
-                    BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
                     
                     DatagramSocket datagramSocket = new DatagramSocket();
                     UnreliableSender unreliableSender = new UnreliableSender(datagramSocket);
@@ -75,10 +74,18 @@ public class Client {
                     sent.put("method", "prepare_proposal");
                     sent.put("proposal_id", "(1,"+client.player_id+")");
                     byte[] sendData = sent.toJSONString().getBytes();
+                    
+                    // PAXOS PREPARE PROPOSAL
                     for(int i=0;i<client.players.size();i++) {
                         String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
-                        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress.substring(1)), listenPort);
+                        int port = (Integer)((JSONObject)client.players.get(i)).get("port");
+                        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress.substring(1)), port);
                         unreliableSender.send(sendPacket, 1.00);
+                    }
+                    
+                    // 
+                    for(int i=0;i<client.players.size();i++) {
+                        
                     }
                 } catch (SocketException ex) {
                     Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
@@ -90,21 +97,10 @@ public class Client {
                 
             } else {
                 // ACCEPTOR
-                try {
-                    System.out.println("You cannot propose");
-                    byte[] receiveData = new byte[1024];
-                    
-                    DatagramSocket serverSocket = new DatagramSocket(listenPort);
-                    DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-                    for(int i=0;i<2;i++) {
-                        serverSocket.receive(receivePacket);
-                        String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
-                        System.out.println(sentence);
-                    }
-                } catch (SocketException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (IOException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                System.out.println("You cannot propose");
+                // PAXOS PREPARE PROPOSAL
+                for(int i=0;i<2;i++) {
+                    String received = client.listenToUDP();
                 }
             }
         }
@@ -140,6 +136,21 @@ public class Client {
         return object;
     }
     
+    public String listenToUDP() {
+        try {
+            byte[] receiveData = new byte[1024];
+            DatagramSocket serverSocket = new DatagramSocket(COMM_PORT);
+            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+            serverSocket.receive(receivePacket);
+            String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
+            System.out.println("String received: "+sentence);
+            return sentence;
+        } catch (IOException ex) {
+            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
+    
     // Send object to server
     public void sendToServer(Object object) {
         System.out.println("Send to server: "+object.toString());
@@ -159,8 +170,14 @@ public class Client {
             Scanner keyboard = new Scanner(System.in);
             System.out.print("Username: ");
             String username = keyboard.nextLine();
+            System.out.print("UDP Address: ");
+            UDP_SERVER_HOSTNAME = keyboard.nextLine();
+            System.out.print("UDP Port: ");
+            UDP_COMM_PORT = keyboard.nextInt();
             // Mengirim username ke server
             obj.put("username", username);
+            obj.put("udp_address",UDP_SERVER_HOSTNAME);
+            obj.put("udp_address",UDP_COMM_PORT);
             obj.put("method","join");
             sendToServer(obj);
 
@@ -168,7 +185,7 @@ public class Client {
             if(obj.get("status")==null) break;
         } while(obj.get("status").equals("fail"));
 
-         // Mendapatkan player id dari server
+        // Mendapatkan player id dari server
         player_id = (Integer)obj.get("player_id");
         obj.clear();
         

@@ -10,9 +10,11 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
@@ -44,11 +46,17 @@ public class Server extends Thread {
     }
     
     public static void main(String[] args) {
+        try {
+            System.out.println(Inet4Address.getLocalHost().getHostAddress());
+        } catch (UnknownHostException ex) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
         do {
             Scanner keyboard = new Scanner(System.in);
             System.out.print("Players amount(>= 6) : ");
             PLAYER_TO_PLAY = keyboard.nextInt();
-        } while(PLAYER_TO_PLAY < 0);        
+        } while(PLAYER_TO_PLAY < 0); /** @TODO Jangan lupa diganti */
         
         // Create server socket
         try {
@@ -87,8 +95,8 @@ public class Server extends Thread {
                         temp.put("player_id", player_id);
                         send(clientSocket, temp);
                         temp.put("is_alive", 1);
-                        temp.put("address",clientSocket.getInetAddress().toString());
-                        temp.put("port",clientSocket.getPort());
+                        temp.put("address",jsonRecv.get("address"));
+                        temp.put("port",(Integer)jsonRecv.get("port"));
                         players.add(temp);
                         randomizeRole(player_id);
                         System.out.println("\nClient Counter: "+ ++clientCount);
@@ -133,11 +141,12 @@ public class Server extends Thread {
                 send(clientSocket, temp);
             }
             else if(jsonRecv.get("method").equals("client_address")) {
-                while(PLAYER_TO_PLAY > clientCount);
+                while(PLAYER_TO_PLAY > clientCount); // Tunggu sampai siap main
                 temp.put("status", "ok");
                 JSONArray playerJSON = new JSONArray();
                 playerJSON.addAll(players);
                 temp.put("clients", playerJSON);
+                temp.put("description", "list of clients retrieved");
                 send(clientSocket, temp);
             }
         } while(!jsonRecv.get("method").equals("leave"));
@@ -146,11 +155,9 @@ public class Server extends Thread {
         leave.put("status", "ok");
         send(clientSocket, leave);
         
-        for(JSONObject p: players) {
-            if((Integer)p.get("player_id") == playerCount) {
-                p = null;
-            }
-        }
+        players.stream().filter((p) -> ((Integer)p.get("player_id") == playerCount)).forEach((p) -> {
+            p = null;
+        });
         System.out.println("\nCommunication Thread Stopped. Client leave!");
         System.out.println("Client Counter: "+ --clientCount);
     }
@@ -198,11 +205,6 @@ public class Server extends Thread {
     }
     
     public Boolean isUsernameExist(String username) {
-        for(JSONObject temp : players) {
-            if(temp.get("username").equals(username)) {
-                return true;
-            }
-        }
-        return false;
+        return players.stream().anyMatch((temp) -> (temp.get("username").equals(username)));
     }
 }
