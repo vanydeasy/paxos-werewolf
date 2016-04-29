@@ -122,7 +122,7 @@ public class Server extends Thread {
                 send(clientSocket, temp);
                 System.out.println("\nReady Counter: "+ ++readyCount);
                 
-                while (readyCount < clientCount){
+                while (readyCount < clientCount && clientCount < PLAYER_TO_PLAY){
                     // keep on waiting
                 }
                 
@@ -205,7 +205,32 @@ public class Server extends Thread {
                     proposed_kpu_id.put(player_id, (Integer)jsonRecv.get("kpu_id"));
                 }
                 send(clientSocket, temp);
+            } else if (jsonRecv.get("method").equals("vote_result_werewolf")) {
+                if (!isPlaying){
+                    temp.put("status", "fail");
+                    temp.put("description", "the game hasn't started yet");
+                } else {
+                    temp.put("status", "ok");
+                    temp.put("description", "vote result for werewolf recieved");
+                }
+            } else if (jsonRecv.get("method").equals("vote_result_civillian")) {
+                if (!isPlaying){
+                    temp.put("status", "fail");
+                    temp.put("description", "the game hasn't started yet");
+                } else {
+                    temp.put("status", "ok");
+                    temp.put("description", "vote result for civillian recieved");
+                }
+            } else if (jsonRecv.get("method").equals("vote_result")) {
+                if (!isPlaying){
+                    temp.put("status", "fail");
+                    temp.put("description", "the game hasn't started yet");
+                } else {
+                    temp.put("status", "fail");
+                    temp.put("description", "no one is killed");
+                }
             }
+            
         } while(!jsonRecv.get("method").equals("leave"));
         
         JSONObject leave = new JSONObject();
