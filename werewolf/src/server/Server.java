@@ -30,14 +30,20 @@ import org.json.simple.JSONObject;
  */
 public class Server extends Thread {
     public final static int COMM_PORT = 8181;  // socket port for client comms
-    private static ServerSocket serverSocket; // server socket
-    private static ArrayList<JSONObject> players = new ArrayList<>();
-    private static ArrayList<String> roles = new ArrayList<>();
-    private final Socket clientSocket;
-    private static int clientCount = 0;
-    private static int playerCount = 0;
-    private static int PLAYER_TO_PLAY;
+    private final static int PLAYER_TO_PLAY = 6; // minimum number of clients
     
+    private static ServerSocket serverSocket; // server socket
+    private static ArrayList<JSONObject> players = new ArrayList<>(); // list of all players
+    private static ArrayList<String> roles = new ArrayList<>(); // list of roles where index equals player_id
+
+    private static int clientCount = 0; // number of clients
+    private static int readyCount = 0; // number of ready clients
+    private static int playerCount = 0; // number of players currently alive
+    private static int day = 0; // number of days
+    private static boolean isDay = false;
+    private static boolean isPlaying = false;
+    
+    private final Socket clientSocket;
     private int player_id;
     
     public Server(Socket clientSocket) {
@@ -51,12 +57,6 @@ public class Server extends Thread {
         } catch (UnknownHostException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
-        do {
-            Scanner keyboard = new Scanner(System.in);
-            System.out.print("Players amount(>= 6) : ");
-            PLAYER_TO_PLAY = keyboard.nextInt();
-        } while(PLAYER_TO_PLAY < 0); /** @TODO Jangan lupa diganti */
         
         // Create server socket
         try {
@@ -83,20 +83,59 @@ public class Server extends Thread {
         System.out.println ("New Communication Thread Started");
         JSONObject jsonRecv;
         do {
+            JSONObject temp = new JSONObject();
+            if (readyCount == clientCount && !isPlaying && clientCount >= PLAYER_TO_PLAY) { // when everyone is ready and the game hasn't started yet  
+                // START GAME
+                isPlaying = true;
+                day++;
+                temp.put("method","start");
+                temp.put("time", "night");
+                temp.put("description", "game is started");
+                temp.put("role",roles.get(player_id));
+                if (roles.get(player_id).equals("werewolf")){
+                    ArrayList<String> friends = new ArrayList<>();
+                    for (int i=0; i<clientCount; i++){
+                        if (roles.get(i).equals("werewolf") && i!=player_id){
+                            String p = (String) players.get(i).get("username");
+                            friends.add(p);
+                        }
+                    }
+                    temp.put("friends", friends);
+                }
+                send(clientSocket, temp);
+                
+                Object recv_status_start = listen(clientSocket);
+                jsonRecv = (JSONObject)recv_status_start;
+                if(jsonRecv.get("status").equals("ok")) { // successfully start the game
+                    // CHANGE PHASE
+                    isDay = true;
+                    temp.clear();
+                    temp.put("method", "change_phase");
+                    temp.put("time", "day");
+                    temp.put("days", ++day);
+                    temp.put("description", "PUT NARRATION HERE");
+                    send(clientSocket, temp);
+                    
+                    Object recv_status_phase = listen(clientSocket);
+                    jsonRecv = (JSONObject)recv_status_phase;
+                } else {
+                    // start game unseccesful (mau diapain yah enaknya)
+                }
+            }
+            
             Object recv = listen(clientSocket);
             jsonRecv = (JSONObject)recv;
-            
-            JSONObject temp = new JSONObject();
+            temp.clear();
             if(jsonRecv.get("method").equals("join")) {
-                if(PLAYER_TO_PLAY > playerCount) {
+                if (!isPlaying){
                     if(!isUsernameExist((String)jsonRecv.get("username"))) {
                         temp.put("username", jsonRecv.get("username"));
                         player_id = playerCount;
                         temp.put("player_id", player_id);
                         send(clientSocket, temp);
                         temp.put("is_alive", 1);
-                        temp.put("address",jsonRecv.get("address"));
-                        temp.put("port",(Integer)jsonRecv.get("port"));
+                        temp.put("address",jsonRecv.get("udp_address"));
+                        temp.put("port",(Integer)jsonRecv.get("udp_port"));
                         players.add(temp);
                         randomizeRole(player_id);
                         System.out.println("\nClient Counter: "+ ++clientCount);
@@ -111,43 +150,23 @@ public class Server extends Thread {
                 else {
                     temp.put("status","fail");
                     temp.put("description", "please wait, game is currently running");
-                    System.out.println("\nClient Counter: "+ ++clientCount);
                 }
             }
             else if(jsonRecv.get("method").equals("ready")) {
                 temp.put("status","ok");
-                if(PLAYER_TO_PLAY > clientCount) {
-                    temp.put("play", 0);
-                    temp.put("player",clientCount);
-                    temp.put("description","waiting for other player to start");
-                }
-                else {
-                    temp.put("play", 1);
-                    temp.put("player",clientCount);
-                    temp.put("description","ready to start");
-                    
-                }
+                temp.put("description","waiting for other player to start");
                 send(clientSocket, temp);
-                
-                while(PLAYER_TO_PLAY > clientCount){
-                    System.out.print("");
-                }
-                
-                temp.clear();
-                temp.put("method","start");
-                temp.put("time", "day");
-                temp.put("description", "game is started");
-                temp.put("role",roles.get(player_id));
-                send(clientSocket, temp);
+                System.out.println("\nReady Counter: "+ ++readyCount);
             }
             else if(jsonRecv.get("method").equals("client_address")) {
-                while(PLAYER_TO_PLAY > clientCount); // Tunggu sampai siap main
-                temp.put("status", "ok");
-                JSONArray playerJSON = new JSONArray();
-                playerJSON.addAll(players);
-                temp.put("clients", playerJSON);
-                temp.put("description", "list of clients retrieved");
-                send(clientSocket, temp);
+                if (isPlaying) {
+                    temp.put("status", "ok");
+                    JSONArray playerJSON = new JSONArray();
+                    playerJSON.addAll(players);
+                    temp.put("clients", playerJSON);
+                    temp.put("description", "list of clients retrieved");
+                    send(clientSocket, temp);
+                }
             }
         } while(!jsonRecv.get("method").equals("leave"));
         
@@ -204,7 +223,8 @@ public class Server extends Thread {
         }
     }
     
-    public Boolean isUsernameExist(String username) {
+    public boolean isUsernameExist(String username) {
         return players.stream().anyMatch((temp) -> (temp.get("username").equals(username)));
     }
+    
 }

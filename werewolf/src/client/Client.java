@@ -41,7 +41,7 @@ public class Client extends Thread {
     private Player player;
     
     public Client() {
-        SERVER_HOSTNAME = "127.0.1.1";
+        SERVER_HOSTNAME = "192.168.0.104";
         COMM_PORT = 8181;
     }
     
@@ -51,7 +51,13 @@ public class Client extends Thread {
     }
     
     public static void main(String[] args) {
-        Client client = new Client();
+        Scanner keyboard = new Scanner(System.in);
+        System.out.print("Server HOSTNAME: ");
+        String s_host = keyboard.nextLine();
+        System.out.print("Server PORT: ");
+        int s_port = Integer.parseInt(keyboard.nextLine());
+        
+        Client client = new Client(s_host, s_port);
         client.connectToServer();
         System.out.println(client.socket);
         
