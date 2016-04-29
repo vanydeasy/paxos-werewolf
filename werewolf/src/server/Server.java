@@ -17,6 +17,8 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.logging.Level;
@@ -35,6 +37,7 @@ public class Server extends Thread {
     private static ServerSocket serverSocket; // server socket
     private static ArrayList<JSONObject> players = new ArrayList<>(); // list of all players
     private static ArrayList<String> roles = new ArrayList<>(); // list of roles where index equals player_id
+    private static Map<Integer, Integer> proposed_kpu_id = new HashMap<>();
 
     private static int clientCount = 0; // number of clients
     private static int readyCount = 0; // number of ready clients
@@ -84,7 +87,8 @@ public class Server extends Thread {
         JSONObject jsonRecv;
         do {
             JSONObject temp = new JSONObject();
-            if (readyCount == clientCount && !isPlaying && clientCount >= PLAYER_TO_PLAY) { // when everyone is ready and the game hasn't started yet  
+            // when everyone is ready and the game hasn't started yet
+            if (readyCount == clientCount && !isPlaying && clientCount >= PLAYER_TO_PLAY) {   
                 // START GAME
                 isPlaying = true;
                 day++;
@@ -115,12 +119,25 @@ public class Server extends Thread {
                     temp.put("days", ++day);
                     temp.put("description", "PUT NARRATION HERE");
                     send(clientSocket, temp);
-                    
-                    Object recv_status_phase = listen(clientSocket);
-                    jsonRecv = (JSONObject)recv_status_phase;
                 } else {
                     // start game unseccesful (mau diapain yah enaknya)
                 }
+            }
+            
+            // every active palyer has proposed a leader
+            // INCLUDING the proposers themselves
+            if (proposed_kpu_id.size() == playerCount){ 
+                int kpu_id = electedKPU();
+                /* TODO: KALO HASIL PEMILU SERI (kpu_id = -1) BELOM DITANGANI */
+                temp.clear();
+                if (kpu_id == proposed_kpu_id.get(player_id)){
+                    temp.put("status", "ok");
+                    temp.put("description", "the KPU candidate you voted for has been elected");
+                } else {
+                    temp.put("status", "fail");
+                    temp.put("description", "the other KPU candidate has been elected");
+                }
+                send(clientSocket, temp);
             }
             
             Object recv = listen(clientSocket);
@@ -165,8 +182,25 @@ public class Server extends Thread {
                     playerJSON.addAll(players);
                     temp.put("clients", playerJSON);
                     temp.put("description", "list of clients retrieved");
-                    send(clientSocket, temp);
+                } else {
+                    temp.put("status", "fail");
+                    temp.put("description", "the game hasn't started yet");
                 }
+                send(clientSocket, temp);
+            }
+            else if (jsonRecv.get("method").equals("prepare_proposal")){
+                if (!isPlaying){
+                    temp.put("status", "fail");
+                    temp.put("description", "the game hasn't started yet");
+                } else if ((Integer)jsonRecv.get("kpu_id") > players.size()-1) {
+                    temp.put("status", "fail");
+                    temp.put("description", "player_id doesn't exist");
+                } else {
+                    temp.put("status", "ok");
+                    temp.put("description", "proposal recieved");
+                    proposed_kpu_id.put(player_id, (Integer)jsonRecv.get("kpu_id"));
+                }
+                send(clientSocket, temp);
             }
         } while(!jsonRecv.get("method").equals("leave"));
         
@@ -179,6 +213,7 @@ public class Server extends Thread {
         });
         System.out.println("\nCommunication Thread Stopped. Client leave!");
         System.out.println("Client Counter: "+ --clientCount);
+        --playerCount;
     }
     
     public static Object listen(Socket socket) {
@@ -225,6 +260,38 @@ public class Server extends Thread {
     
     public boolean isUsernameExist(String username) {
         return players.stream().anyMatch((temp) -> (temp.get("username").equals(username)));
+    }
+    
+    public int electedKPU(){
+        int smallest_id = 0, candidate1_id = 0, candidate2_id = 0;
+        int candidate1_count = 0, candidate2_count = 0;
+        for (int i=0; i<players.size(); i++){
+            if ((Integer)players.get(i).get("is_alive") == 1){
+                candidate1_id = proposed_kpu_id.get(i);
+                candidate1_count++;
+                smallest_id = i;
+                break;
+            }
+        }
+        
+        for (int i = smallest_id+1; i<players.size(); i++){
+            if ((Integer)players.get(i).get("is_alive") == 1){
+                if (proposed_kpu_id.get(i) == candidate1_id){
+                    candidate1_count++;
+                } else {
+                    candidate2_id = proposed_kpu_id.get(i);
+                    candidate2_count++;
+                }
+            }
+        }
+        
+        if (candidate2_count > candidate1_count){
+            return candidate2_id;
+        } else if (candidate2_count < candidate1_count){
+            return candidate1_id;
+        } else { // DRAW
+            return -1;
+        }
     }
     
 }
