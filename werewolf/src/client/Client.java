@@ -266,6 +266,8 @@ public class Client extends Thread {
                 temp.put("status", "ok");
                 temp.put("description", "accepted");
                 temp.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
+                byte[] sendData = temp.toJSONString().getBytes();
+                this.sendToUDP(this.getPlayerAddress(Integer.parseInt((String)jsonRecv.get("player_id"))), this.getPlayerPort(Integer.parseInt((String)jsonRecv.get("player_id"))), sendData);
             } else if (jsonRecv.get("method").equals("accept_proposal")) {
                 if(num_proposal < 2) {
                     num_proposal++;
@@ -340,28 +342,6 @@ public class Client extends Thread {
 
             }
             
-            DatagramSocket datagramSocket;
-            UnreliableSender unreliableSender;
-            try {
-                datagramSocket = new DatagramSocket();
-                unreliableSender = new UnreliableSender(datagramSocket);
-                byte[] sendData = temp.toJSONString().getBytes();
-                
-                String ipAddress = ""; // dapet darimana?
-                int port = 0; // dapet darimana?
-                        
-                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress.substring(1)), port);
-                unreliableSender.send(sendPacket, 1.00);
-                
-            } catch (SocketException ex) {
-                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (IOException ex) {
-                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            
-            
-            
-
         } while (true);
         
     }
