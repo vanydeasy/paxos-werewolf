@@ -18,6 +18,8 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,6 +41,10 @@ public class Client extends Thread {
     
     private JSONArray players = new JSONArray();
     private Player player;
+    private ArrayList<String> friends = new ArrayList<String>();
+    
+    private boolean isDay;
+    private int day = 0;
     
     public Client() {
         SERVER_HOSTNAME = "192.168.0.104";
@@ -69,6 +75,13 @@ public class Client extends Thread {
         // while belum menang
         
         if(client.players.size() > 2) {
+            
+            //mulai game malam, werewolf saling kenal
+            client.startGame();
+            
+            //siang
+            client.changePhase();
+            
             if(client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
                 || client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
                 // PROPOSER pid dua terbesar (player ke n dan n­1) 
@@ -234,6 +247,54 @@ public class Client extends Thread {
         
         // Menerima address semua klien dari server
         players = (JSONArray)((JSONObject)listenToServer()).get("clients");
+    }
+    
+    public void startGame() {
+        JSONObject recv = (JSONObject)listenToServer();
+        if(recv.get("method").equals("start")) {
+            isDay = (boolean) recv.get("time");
+            player.setRole((String) recv.get("role"));
+            friends = (ArrayList)recv.get("friends");
+           
+            JSONObject obj = new JSONObject();
+            obj.put("status","ok");
+            sendToServer(obj);
+        }
+        
+        day++;
+        isDay = true;
+    }
+    
+    public void changePhase() {
+        JSONObject recv = (JSONObject)listenToServer();
+        if(recv.get("method").equals("change_phase")) {
+            day = (int) recv.get("days");
+            if (recv.get("time").equals("day")) {
+                isDay = true;
+            } else {
+                isDay = false;
+            }
+            
+            JSONObject obj = new JSONObject();
+            obj.put("status","ok");
+            sendToServer(obj);
+        }
+    }
+    
+    public void requestListOfClients() {
+        JSONObject recv;
+        do { // send method
+            JSONObject obj = new JSONObject();
+            obj.put("method","client_address");
+            sendToServer(obj);
+            
+            recv = (JSONObject)listenToServer();
+            players = (JSONArray)recv.get("clients");
+
+            if(!recv.get("status").equals("ok")) {
+                System.out.println(recv.toJSONString());
+            }
+        } while(!recv.get("status").equals("ok"));
     }
     
     public void leaveGame() {
