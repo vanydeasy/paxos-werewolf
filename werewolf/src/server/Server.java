@@ -42,9 +42,9 @@ public class Server extends Thread {
     private static int clientCount = 0; // number of clients
     private static int readyCount = 0; // number of ready clients
     private static int playerCount = 0; // number of players currently alive
-    private static int day = 0; // number of days
-    private static boolean isDay = false;
-    private static boolean isPlaying = false;
+    private int day = 0; // number of days
+    private boolean isDay = false;
+    private boolean isPlaying = false;
     
     private final Socket clientSocket;
     private int player_id;
@@ -87,59 +87,7 @@ public class Server extends Thread {
         JSONObject jsonRecv;
         do {
             JSONObject temp = new JSONObject();
-            // when everyone is ready and the game hasn't started yet
-            if (readyCount == clientCount && !isPlaying && clientCount >= PLAYER_TO_PLAY) {   
-                // START GAME
-                isPlaying = true;
-                day++;
-                temp.put("method","start");
-                temp.put("time", "night");
-                temp.put("description", "game is started");
-                temp.put("role",roles.get(player_id));
-                if (roles.get(player_id).equals("werewolf")){
-                    ArrayList<String> friends = new ArrayList<>();
-                    for (int i=0; i<clientCount; i++){
-                        if (roles.get(i).equals("werewolf") && i!=player_id){
-                            String p = (String) players.get(i).get("username");
-                            friends.add(p);
-                        }
-                    }
-                    temp.put("friends", friends);
-                }
-                send(clientSocket, temp);
-                
-                Object recv_status_start = listen(clientSocket);
-                jsonRecv = (JSONObject)recv_status_start;
-                if(jsonRecv.get("status").equals("ok")) { // successfully start the game
-                    // CHANGE PHASE
-                    isDay = true;
-                    temp.clear();
-                    temp.put("method", "change_phase");
-                    temp.put("time", "day");
-                    temp.put("days", ++day);
-                    temp.put("description", "PUT NARRATION HERE");
-                    send(clientSocket, temp);
-                } else {
-                    // start game unseccesful (mau diapain yah enaknya)
-                }
-            }
-            
-            // every active palyer has proposed a leader
-            // INCLUDING the proposers themselves
-            if (proposed_kpu_id.size() == playerCount){ 
-                int kpu_id = electedKPU();
-                /* TODO: KALO HASIL PEMILU SERI (kpu_id = -1) BELOM DITANGANI */
-                temp.clear();
-                if (kpu_id == proposed_kpu_id.get(player_id)){
-                    temp.put("status", "ok");
-                    temp.put("description", "the KPU candidate you voted for has been elected");
-                } else {
-                    temp.put("status", "fail");
-                    temp.put("description", "the other KPU candidate has been elected");
-                }
-                send(clientSocket, temp);
-            }
-            
+                        
             Object recv = listen(clientSocket);
             jsonRecv = (JSONObject)recv;
             temp.clear();
@@ -174,6 +122,63 @@ public class Server extends Thread {
                 temp.put("description","waiting for other player to start");
                 send(clientSocket, temp);
                 System.out.println("\nReady Counter: "+ ++readyCount);
+                
+                while (readyCount < clientCount){
+                    // keep on waiting
+                }
+                
+                // when everyone is ready and the game hasn't started yet
+                if (readyCount == clientCount && !isPlaying && clientCount >= PLAYER_TO_PLAY) {   
+                    // START GAME
+                    isPlaying = true;
+                    day++;
+                    temp.put("method","start");
+                    temp.put("time", "night");
+                    temp.put("description", "game is started");
+                    temp.put("role",roles.get(player_id));
+                    if (roles.get(player_id).equals("werewolf")){
+                        ArrayList<String> friends = new ArrayList<>();
+                        for (int i=0; i<clientCount; i++){
+                            if (roles.get(i).equals("werewolf") && i!=player_id){
+                                String p = (String) players.get(i).get("username");
+                                friends.add(p);
+                            }
+                        }
+                        temp.put("friends", friends);
+                    }
+                    send(clientSocket, temp);
+
+                    Object recv_status_start = listen(clientSocket);
+                    jsonRecv = (JSONObject)recv_status_start;
+                    if(jsonRecv.get("status").equals("ok")) { // successfully start the game
+                        // CHANGE PHASE
+                        isDay = true;
+                        temp.clear();
+                        temp.put("method", "change_phase");
+                        temp.put("time", "day");
+                        temp.put("days", ++day);
+                        temp.put("description", "PUT NARRATION HERE");
+                        send(clientSocket, temp);
+                    } else {
+                        // start game unseccesful (mau diapain yah enaknya)
+                    }
+                }
+
+                // every active palyer has proposed a leader
+                // INCLUDING the proposers themselves
+                if (proposed_kpu_id.size() == playerCount){ 
+                    int kpu_id = electedKPU();
+                    /* TODO: KALO HASIL PEMILU SERI (kpu_id = -1) BELOM DITANGANI */
+                    temp.clear();
+                    if (kpu_id == proposed_kpu_id.get(player_id)){
+                        temp.put("status", "ok");
+                        temp.put("description", "the KPU candidate you voted for has been elected");
+                    } else {
+                        temp.put("status", "fail");
+                        temp.put("description", "the other KPU candidate has been elected");
+                    }
+                    send(clientSocket, temp);
+                }
             }
             else if(jsonRecv.get("method").equals("client_address")) {
                 if (isPlaying) {
