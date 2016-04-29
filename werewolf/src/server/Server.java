@@ -84,6 +84,7 @@ public class Server extends Thread {
     public void run() {
         System.out.println ("New Communication Thread Started");
         JSONObject jsonRecv;
+        boolean isLeave = false;
         do {
             JSONObject temp = new JSONObject();
                         
@@ -122,8 +123,9 @@ public class Server extends Thread {
                 send(clientSocket, temp);
                 System.out.println("\nReady Counter: "+ ++readyCount);
                 
-                while (readyCount < clientCount && clientCount < PLAYER_TO_PLAY){
+                while (readyCount < clientCount || clientCount < PLAYER_TO_PLAY){
                     // keep on waiting
+                    System.out.print("");
                 }
                 
                 // when everyone is ready and the game hasn't started yet
@@ -230,8 +232,9 @@ public class Server extends Thread {
                     temp.put("description", "no one is killed");
                 }
             }
-            
-        } while(!jsonRecv.get("method").equals("leave"));
+            String method = (String)jsonRecv.get("method");
+            if(method != null) isLeave = method.equals("leave");
+        } while(!isLeave);
         
         JSONObject leave = new JSONObject();
         leave.put("status", "ok");

@@ -39,7 +39,7 @@ public class Client extends Thread {
     public String SERVER_HOSTNAME;
     public int COMM_PORT;  // socket port for client comms
     
-    private JSONArray players = new JSONArray();
+    private static JSONArray players = new JSONArray();
     private Player player;
     private ArrayList<String> friends = new ArrayList<String>();
     
@@ -70,18 +70,19 @@ public class Client extends Thread {
         // Get username from user
         client.joinGame();
 
+        //mulai game malam, werewolf saling kenal
+        client.startGame();
+        
+        //siang
+        client.changePhase();
+            
         // GAME PLAY HERE
-        client.start();
+        // client.start();
         // while belum menang
         
-        if(client.players.size() > 2) {
-            
-            //mulai game malam, werewolf saling kenal
-            client.startGame();
-            
-            //siang
-            client.changePhase();
-            
+        while(true) {
+            System.out.println("START GAME");
+                        
             if(client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
                 || client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
                 // PROPOSER pid dua terbesar (player ke n dan n­1) 
@@ -121,7 +122,7 @@ public class Client extends Thread {
             }
         }
         
-        client.leaveGame();
+        //client.leaveGame();
     }
     
     public void connectToServer() { // Connect client to server (binding)
@@ -226,21 +227,23 @@ public class Client extends Thread {
         
         // Mengirim ready ke user
         obj.put("method","ready");
+        player.setReady(true);
         sendToServer(obj);
         
         // Mendapatkan status dari server = ok
         obj = (JSONObject)listenToServer();
         if(obj.get("status").equals("ok")) {
-            obj = (JSONObject)listenToServer();
+            // Mendapatkan role dari server saat player sudah cukup
+            String role = (String)((JSONObject)listenToServer()).get("role");
+            System.out.println("YOUR ROLE IS "+role);
+            this.player.setRole(role);
+            if(obj.get("description") != null) {
+                System.out.println(obj.get("description"));
+            }
         }
-        // Mendapatkan role dari server saat player sudah cukup
-        String role = (String)((JSONObject)listenToServer()).get("role");
-        System.out.println("YOUR ROLE IS "+role);
-        this.player.setRole(role);
-        if(obj.get("description") != null) {
-            System.out.println(obj.get("description"));
-        }
-        
+        obj.clear();
+        obj.put("status", "ok");
+        sendToServer(obj);
         // Meminta address semua klien dari server
         obj.clear();
         obj.put("method", "client_address");
@@ -260,6 +263,9 @@ public class Client extends Thread {
 
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
+            sendToServer(obj);
+            obj.clear();
+            obj.put("method","client_address");
             sendToServer(obj);
         }
         
