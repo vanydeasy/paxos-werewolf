@@ -5,6 +5,7 @@
  */
 package client;
 
+import game.Player;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -36,19 +37,8 @@ public class Client extends Thread {
     public String SERVER_HOSTNAME;
     public int COMM_PORT;  // socket port for client comms
     
-    // FOR UDP CONNECTION
-    public int UDP_COMM_PORT;
-    
-    private int player_id;
-    private String role;
     private JSONArray players = new JSONArray();
-    
-    // IS PROPOSER AND IS KPU
-    private boolean proposer = false;
-    private int kpu_id= -1;
-    
-    private int num_round = 0;
-    
+    private Player player;
     
     public Client() {
         SERVER_HOSTNAME = "127.0.1.1";
@@ -72,44 +62,41 @@ public class Client extends Thread {
         client.start();
         // while belum menang
         
-        client.num_round++;
         if(client.players.size() > 2) {
-            if(client.player_id == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
-                || client.player_id == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
+            if(client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
+                || client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
                 // PROPOSER pid dua terbesar (player ke n dan n­1) 
-                client.proposer = true;
-                
-                try {
-                    System.out.println("You can propose");
-                    
-                    // PAXOS PREPARE PROPOSAL
-                    DatagramSocket datagramSocket = new DatagramSocket();
-                    UnreliableSender unreliableSender = new UnreliableSender(datagramSocket);
-                    JSONObject sent = new JSONObject();
-                    sent.put("method", "prepare_proposal");
-                    sent.put("proposal_id", "("+client.num_round+","+client.player_id+")"); // (local clock, local identifier)
-                    byte[] sendData = sent.toJSONString().getBytes();
-                    
-                    for(int i=0;i<client.players.size();i++) {
-                        String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
-                        int port = (Integer)((JSONObject)client.players.get(i)).get("port");
-                        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress.substring(1)), port);
-                        unreliableSender.send(sendPacket, 1.00);
-                    }
-                    
-                    // PAXOS ACCEPT PROPOSAL
-                    
-                } catch (SocketException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (UnknownHostException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (IOException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                client.player.setProposer(true);
+
+                System.out.println("You can propose");
+
+                // PAXOS PREPARE PROPOSAL
+                JSONObject sent = new JSONObject();
+                sent.put("method", "prepare_proposal");
+                sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
+                byte[] sendData = sent.toJSONString().getBytes();
+
+                for(int i=0;i<client.players.size();i++) {
+                    String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
+                    int port = (Integer)((JSONObject)client.players.get(i)).get("port");
+                    client.sendToUDP(ipAddress, port, sendData);
+                }
+
+                // PAXOS ACCEPT PROPOSAL
+                sent.clear();
+                sent.put("method", "accept_proposal");
+                sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
+                sendData = sent.toJSONString().getBytes();
+
+                for(int i=0;i<client.players.size();i++) {
+                    String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
+                    int port = (Integer)((JSONObject)client.players.get(i)).get("port");
+                    client.sendToUDP(ipAddress, port, sendData);
                 }
                 
             } else {
                 // ACCEPTOR
-                client.proposer = false;
+                client.player.setProposer(false);
                 System.out.println("You cannot propose");
 
             }
@@ -149,7 +136,7 @@ public class Client extends Thread {
     public String listenToUDP() {
         try {
             byte[] receiveData = new byte[1024];
-            DatagramSocket serverSocket = new DatagramSocket(UDP_COMM_PORT);
+            DatagramSocket serverSocket = new DatagramSocket(player.getUDPPort());
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             serverSocket.receive(receivePacket);
             String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
@@ -174,20 +161,35 @@ public class Client extends Thread {
         }
     }
     
+    public void sendToUDP(String ipAddress, int port, byte[] sendData) {
+        try {
+            DatagramSocket datagramSocket = new DatagramSocket();
+            UnreliableSender unreliableSender = new UnreliableSender(datagramSocket);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress.substring(1)), port);
+            unreliableSender.send(sendPacket, 1.00);
+        } catch (SocketException ex) {
+            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        catch (IOException ex) {
+            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
     public void joinGame() {
         JSONObject obj = new JSONObject();
+        String username = null; int udp_port = 0;
         do {
             try {
                 Scanner keyboard = new Scanner(System.in);
                 System.out.print("Username: ");
-                String username = keyboard.nextLine();
+                username = keyboard.nextLine();
                 System.out.print("UDP Port: ");
-                UDP_COMM_PORT = keyboard.nextInt();
+                udp_port = keyboard.nextInt();
                 
                 // Mengirim data user ke server
                 obj.put("username", username);
                 obj.put("address",Inet4Address.getLocalHost().getHostAddress());
-                obj.put("port",UDP_COMM_PORT);
+                obj.put("port",udp_port);
                 obj.put("method","join");
                 sendToServer(obj);
                 
@@ -199,7 +201,8 @@ public class Client extends Thread {
         } while(obj.get("status").equals("fail"));
 
         // Mendapatkan player id dari server
-        player_id = (Integer)obj.get("player_id");
+        int player_id = (Integer)obj.get("player_id");
+        this.player = new Player(player_id, username, udp_port);
         obj.clear();
         
         // Mengirim ready ke user
@@ -210,8 +213,9 @@ public class Client extends Thread {
         obj = (JSONObject)listenToServer();
         if(obj.get("status").equals("ok")) {
             // Mendapatkan role dari server saat player sudah cukup
-            role = (String)((JSONObject)listenToServer()).get("role");
+            String role = (String)((JSONObject)listenToServer()).get("role");
             System.out.println("YOUR ROLE IS "+role);
+            this.player.setRole(role);
         }
         else if(obj.get("description") != null) {
             System.out.println(obj.get("description"));
@@ -242,8 +246,11 @@ public class Client extends Thread {
     @Override
     public void run() {
         // Used for listening to socket
+        System.out.println ("New Communication Thread Started");
+        
+        JSONObject proposal_1 = null;
+        int num_proposal = 0;
         do {
-            System.out.println ("New Communication Thread Started");
             String recv = listenToUDP();
             
             JSONParser parser = new JSONParser();
@@ -255,21 +262,82 @@ public class Client extends Thread {
             }
             
             JSONObject temp = new JSONObject();
-            if (proposer == false){ // acceptor
-                if(jsonRecv.get("method").equals("prepare_proposal")){
-                    temp.put("status", "ok");
-                    temp.put("description", "accepted");
-                    temp.put("previous_accepted", kpu_id); // gue ga ngerti previous kpu_id maksudnya apa
-                } else if (jsonRecv.get("method").equals("accept_proposal")){
-                    // jika ini proposer yang pertama (?) karena leader cuma boleh satu
+            if(jsonRecv.get("method").equals("prepare_proposal")){
+                temp.put("status", "ok");
+                temp.put("description", "accepted");
+                temp.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
+            } else if (jsonRecv.get("method").equals("accept_proposal")) {
+                if(num_proposal < 2) {
+                    num_proposal++;
+
+                    if(num_proposal == 2 && !this.player.isProposer()) {
+                        String prop_1 = (String)proposal_1.get("proposal_id");
+                        String prop_2 = (String)jsonRecv.get("proposal_id");
+
+                        int proposal_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf('(')+1, prop_1.indexOf(',')-1));
+                        int proposal_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf('(')+1, prop_2.indexOf(',')-1));
+                        int player_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf(',')+2, prop_1.indexOf(')')-1));
+                        int player_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf(',')+2, prop_2.indexOf(')')-1));
+                        
+                        if(proposal_id_1 > proposal_id_2) {
+                            temp.put("status", "ok");
+                            temp.put("description", "accepted");
+                            byte[] sendData = temp.toJSONString().getBytes();
+                            this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
+                            temp.clear();
+                            temp.put("status", "fail");
+                            temp.put("description", "rejected");
+                            sendData = temp.toJSONString().getBytes();
+                            this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
+                        }
+                        else if(proposal_id_1 < proposal_id_2) {
+                            temp.put("status", "ok");
+                            temp.put("description", "accepted");
+                            byte[] sendData = temp.toJSONString().getBytes();
+                            this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
+                            temp.clear();
+                            temp.put("status", "fail");
+                            temp.put("description", "rejected");
+                            sendData = temp.toJSONString().getBytes();
+                            this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
+                        }
+                        else { //proposal_id_1 == proposal_id_2
+                            if(player_id_1 < player_id_2) {
+                                int temp_id = player_id_1;
+                                player_id_1 = player_id_2;
+                                player_id_2 = temp_id;
+                            }
+                            temp.put("status", "ok");
+                            temp.put("description", "accepted");
+                            byte[] sendData = temp.toJSONString().getBytes();
+                            this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
+                            temp.clear();
+                            temp.put("status", "fail");
+                            temp.put("description", "rejected");
+                            sendData = temp.toJSONString().getBytes();
+                            this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
+                        }
+                        proposal_1 = null;
+
+                    }
+                    else if(num_proposal == 1 && !this.player.isProposer()) {
+                        proposal_1 = jsonRecv;
+                    }
+                    else if(num_proposal == 1 && this.player.isProposer()) {
+                        String proposal = (String)jsonRecv.get("proposal_id");
+                        int proposal_id = Integer.parseInt(proposal.substring(proposal.indexOf(',')+2, proposal.indexOf(')')-1));
                         temp.put("status", "ok");
                         temp.put("description", "accepted");
-                    // jika bukan
+                        byte[] sendData = temp.toJSONString().getBytes();
+                        this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
+                        temp.clear();
                         temp.put("status", "fail");
                         temp.put("description", "rejected");
+                        sendData = temp.toJSONString().getBytes();
+                        this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
+                    }
                 }
-            } else { // proposer
-                
+
             }
             
             DatagramSocket datagramSocket;
@@ -298,4 +366,24 @@ public class Client extends Thread {
         
     }
     
+    public String getPlayerAddress(int id) {
+        for(int i = 0; i < players.size(); i++) {
+            JSONObject temp = (JSONObject)this.players.get(this.players.size()-1);
+            if(Integer.parseInt((String)temp.get("player_id")) == id) {
+                return (String)temp.get("address");
+            }
+        }
+        return null;
+    }
+    
+    public int getPlayerPort(int id) {
+        for(int i = 0; i < players.size(); i++) {
+            JSONObject temp = (JSONObject)this.players.get(this.players.size()-1);
+            if(Integer.parseInt((String)temp.get("player_id")) == id) {
+                return Integer.parseInt((String)temp.get("port"));
+            }
+        }
+        return -1;
+    }
+
 }

@@ -11,7 +11,7 @@ import java.io.Serializable;
  *
  * @author Acer
  */
-public class Player implements Serializable{
+public class Player implements Serializable {
     private int player_id = 0;
     private String player_name;
     private String player_role;
@@ -25,6 +25,8 @@ public class Player implements Serializable{
     private boolean state; //alive=true; dead=false
     private boolean isReady;
     
+    private int proposal_id;
+    
     public Player(int id, String name, int port) {
         player_id = id;
         player_name = name;
@@ -35,6 +37,8 @@ public class Player implements Serializable{
         
         proposer = false;
         kpu_id = -1;
+        
+        proposal_id = -1;
     }
     
     public int getID() {
@@ -57,7 +61,7 @@ public class Player implements Serializable{
         return isReady;
     }
     
-    public int getUDPPOrt() {
+    public int getUDPPort() {
         return udp_port; 
     }
     
@@ -65,12 +69,16 @@ public class Player implements Serializable{
         return udp_ip; 
     }
     
-    public int getKPUId() {
+    public int getKPUID() {
         return kpu_id;
     }
     
     public boolean isProposer() {
         return proposer;
+    }
+    
+    public int getProposalID() {
+        return proposal_id;
     }
     
     public void setProposer(boolean val) {
@@ -92,4 +100,9 @@ public class Player implements Serializable{
     public void setKPU(int val) {
         kpu_id = val;
     }
+    
+    public void setProposalID(int new_proposal_id) {
+        proposal_id = new_proposal_id;
+    }
+    
 }
