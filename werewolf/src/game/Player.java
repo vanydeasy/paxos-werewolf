@@ -6,7 +6,6 @@
 package game;
 
 import java.io.Serializable;
-import java.net.Socket;
 
 /**
  *

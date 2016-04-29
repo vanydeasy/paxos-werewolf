@@ -12,6 +12,7 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
@@ -31,19 +32,23 @@ import org.json.simple.parser.ParseException;
  */
 public class Client extends Thread {
     // FOR TCP CONNECTION
+    private Socket socket;
     public String SERVER_HOSTNAME;
     public int COMM_PORT;  // socket port for client comms
     
     // FOR UDP CONNECTION
-    public String UDP_SERVER_HOSTNAME;
     public int UDP_COMM_PORT;
-    
-    private Socket socket;
     
     private int player_id;
     private String role;
     private JSONArray players = new JSONArray();
-    private boolean proposer;
+    
+    // IS PROPOSER AND IS KPU
+    private boolean proposer = false;
+    private int kpu_id= -1;
+    
+    private int num_round = 0;
+    
     
     public Client() {
         SERVER_HOSTNAME = "127.0.1.1";
@@ -64,6 +69,10 @@ public class Client extends Thread {
         client.joinGame();
 
         // GAME PLAY HERE
+        client.start();
+        // while belum menang
+        
+        client.num_round++;
         if(client.players.size() > 2) {
             if(client.player_id == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
                 || client.player_id == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
@@ -73,14 +82,14 @@ public class Client extends Thread {
                 try {
                     System.out.println("You can propose");
                     
+                    // PAXOS PREPARE PROPOSAL
                     DatagramSocket datagramSocket = new DatagramSocket();
                     UnreliableSender unreliableSender = new UnreliableSender(datagramSocket);
                     JSONObject sent = new JSONObject();
                     sent.put("method", "prepare_proposal");
-                    sent.put("proposal_id", "(1,"+client.player_id+")");
+                    sent.put("proposal_id", "("+client.num_round+","+client.player_id+")"); // (local clock, local identifier)
                     byte[] sendData = sent.toJSONString().getBytes();
                     
-                    // PAXOS PREPARE PROPOSAL
                     for(int i=0;i<client.players.size();i++) {
                         String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
                         int port = (Integer)((JSONObject)client.players.get(i)).get("port");
@@ -88,6 +97,7 @@ public class Client extends Thread {
                         unreliableSender.send(sendPacket, 1.00);
                     }
                     
+                    // PAXOS ACCEPT PROPOSAL
                     
                 } catch (SocketException ex) {
                     Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
@@ -139,7 +149,7 @@ public class Client extends Thread {
     public String listenToUDP() {
         try {
             byte[] receiveData = new byte[1024];
-            DatagramSocket serverSocket = new DatagramSocket(COMM_PORT);
+            DatagramSocket serverSocket = new DatagramSocket(UDP_COMM_PORT);
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             serverSocket.receive(receivePacket);
             String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
@@ -167,22 +177,25 @@ public class Client extends Thread {
     public void joinGame() {
         JSONObject obj = new JSONObject();
         do {
-            Scanner keyboard = new Scanner(System.in);
-            System.out.print("Username: ");
-            String username = keyboard.nextLine();
-            System.out.print("UDP Address: ");
-            UDP_SERVER_HOSTNAME = keyboard.nextLine();
-            System.out.print("UDP Port: ");
-            UDP_COMM_PORT = keyboard.nextInt();
-            // Mengirim username ke server
-            obj.put("username", username);
-            obj.put("udp_address",UDP_SERVER_HOSTNAME);
-            obj.put("udp_address",UDP_COMM_PORT);
-            obj.put("method","join");
-            sendToServer(obj);
-
-            obj = (JSONObject)listenToServer();
-            if(obj.get("status")==null) break;
+            try {
+                Scanner keyboard = new Scanner(System.in);
+                System.out.print("Username: ");
+                String username = keyboard.nextLine();
+                System.out.print("UDP Port: ");
+                UDP_COMM_PORT = keyboard.nextInt();
+                
+                // Mengirim data user ke server
+                obj.put("username", username);
+                obj.put("address",Inet4Address.getLocalHost().getHostAddress());
+                obj.put("port",UDP_COMM_PORT);
+                obj.put("method","join");
+                sendToServer(obj);
+                
+                obj = (JSONObject)listenToServer();
+                if(obj.get("status")==null) break;
+            } catch (UnknownHostException ex) {
+                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            }
         } while(obj.get("status").equals("fail"));
 
         // Mendapatkan player id dari server
@@ -199,6 +212,9 @@ public class Client extends Thread {
             // Mendapatkan role dari server saat player sudah cukup
             role = (String)((JSONObject)listenToServer()).get("role");
             System.out.println("YOUR ROLE IS "+role);
+        }
+        else if(obj.get("description") != null) {
+            System.out.println(obj.get("description"));
         }
         
         // Meminta address semua klien dari server
@@ -225,6 +241,7 @@ public class Client extends Thread {
     
     @Override
     public void run() {
+        // Used for listening to socket
         do {
             System.out.println ("New Communication Thread Started");
             String recv = listenToUDP();
@@ -242,7 +259,7 @@ public class Client extends Thread {
                 if(jsonRecv.get("method").equals("prepare_proposal")){
                     temp.put("status", "ok");
                     temp.put("description", "accepted");
-                    temp.put("previous_accepted", ""); // gue ga ngerti previous kpu_id maksudnya apa
+                    temp.put("previous_accepted", kpu_id); // gue ga ngerti previous kpu_id maksudnya apa
                 } else if (jsonRecv.get("method").equals("accept_proposal")){
                     // jika ini proposer yang pertama (?) karena leader cuma boleh satu
                         temp.put("status", "ok");
