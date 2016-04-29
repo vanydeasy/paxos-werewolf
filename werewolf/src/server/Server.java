@@ -18,7 +18,6 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
-import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.json.simple.JSONArray;
@@ -30,7 +29,7 @@ import org.json.simple.JSONObject;
  */
 public class Server extends Thread {
     public final static int COMM_PORT = 8181;  // socket port for client comms
-    private final static int PLAYER_TO_PLAY = 6; // minimum number of clients
+    private final static int PLAYER_TO_PLAY = 3; // minimum number of clients
     
     private static ServerSocket serverSocket; // server socket
     private static ArrayList<JSONObject> players = new ArrayList<>(); // list of all players

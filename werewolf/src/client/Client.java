@@ -231,12 +231,13 @@ public class Client extends Thread {
         // Mendapatkan status dari server = ok
         obj = (JSONObject)listenToServer();
         if(obj.get("status").equals("ok")) {
-            // Mendapatkan role dari server saat player sudah cukup
-            String role = (String)((JSONObject)listenToServer()).get("role");
-            System.out.println("YOUR ROLE IS "+role);
-            this.player.setRole(role);
+            obj = (JSONObject)listenToServer();
         }
-        else if(obj.get("description") != null) {
+        // Mendapatkan role dari server saat player sudah cukup
+        String role = (String)((JSONObject)listenToServer()).get("role");
+        System.out.println("YOUR ROLE IS "+role);
+        this.player.setRole(role);
+        if(obj.get("description") != null) {
             System.out.println(obj.get("description"));
         }
         
@@ -254,8 +255,9 @@ public class Client extends Thread {
         if(recv.get("method").equals("start")) {
             isDay = (boolean) recv.get("time");
             player.setRole((String) recv.get("role"));
-            friends = (ArrayList)recv.get("friends");
-           
+            if(recv.get("friends")!=null)
+                friends = (ArrayList)recv.get("friends");
+
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
             sendToServer(obj);
