@@ -17,6 +17,10 @@ public class Player implements Serializable{
     private String player_role;
     
     private int udp_port;
+    private int udp_ip;
+    
+    private boolean proposer;
+    private int kpu_id;
     
     private boolean state; //alive=true; dead=false
     private boolean isReady;
@@ -28,6 +32,9 @@ public class Player implements Serializable{
         udp_port = port;
         state = true;
         isReady = false;    //ini gatau true pas kapan
+        
+        proposer = false;
+        kpu_id = -1;
     }
     
     public int getID() {
@@ -54,6 +61,22 @@ public class Player implements Serializable{
         return udp_port; 
     }
     
+    public int getUDPIP() {
+        return udp_ip; 
+    }
+    
+    public int getKPUId() {
+        return kpu_id;
+    }
+    
+    public boolean isProposer() {
+        return proposer;
+    }
+    
+    public void setProposer(boolean val) {
+        proposer = val;
+    }
+    
     public void setRole(String new_role) {
         player_role = new_role;
     }
@@ -64,5 +87,9 @@ public class Player implements Serializable{
     
     public void setReady (boolean value) { //nama fungsinya jelek wkwkwk
         isReady = value;
+    }
+    
+    public void setKPU(int val) {
+        kpu_id = val;
     }
 }
