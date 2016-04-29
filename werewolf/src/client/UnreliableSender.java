@@ -23,6 +23,12 @@ public class UnreliableSender
     private int port;
     private Random random;
 
+    public UnreliableSender(DatagramSocket datagramSocket) {
+        this.datagramSocket = datagramSocket;
+        
+        random = new Random();
+    }
+    
     public UnreliableSender(DatagramSocket datagramSocket, String hostname, int port) throws SocketException, UnknownHostException {
         this.datagramSocket = datagramSocket;
         this.address = InetAddress.getByName(hostname);
