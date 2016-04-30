@@ -72,15 +72,15 @@ public class Client extends Thread {
 
         //mulai game malam, werewolf saling kenal
         client.startGame();
+        System.out.println("START GAME");
+        client.start();
         
         //siang
         client.changePhase();
         
         // GAME PLAY HERE
         
-        while(true) {
-            System.out.println("START GAME");
-                        
+        while(true) {                      
             if(client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
                 || client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
                 // PROPOSER pid dua terbesar (player ke n dan n­1) 
@@ -97,36 +97,33 @@ public class Client extends Thread {
                 for(int i=0;i<client.players.size();i++) {
                     String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
                     int port = (Integer)((JSONObject)client.players.get(i)).get("port");
-                    client.sendToUDP(ipAddress, port, sendData);
-                }
-
-                // INI HARUSNYA NUNGGU DI OK DARI CLIENT DULU
-                
-                // PAXOS ACCEPT PROPOSAL
-                sent.clear();
-                sent.put("method", "accept_proposal");
-                sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
-                sendData = sent.toJSONString();
-
-                for(int i=0;i<client.players.size();i++) {
-                    String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
-                    int port = (Integer)((JSONObject)client.players.get(i)).get("port");
-                    client.sendToUDP(ipAddress, port, sendData);
-                }
-                
-            } else {
-                try {
-                    // ACCEPTOR
-                    client.player.setProposer(false);
-                    System.out.println("You cannot propose");
-                    String recv = client.listenToUDP();
+                    if ( port != client.player.getUDPPort()){
+                        client.sendToUDP(ipAddress, port, sendData);
+                    }
                     
-                    JSONParser parser = new JSONParser();
-                    JSONObject jsonRecv = new JSONObject();
-                    jsonRecv = (JSONObject) parser.parse(recv);
-                } catch (ParseException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                }
+                    // NUNGGU JAWABAN "OK" DARI CLIENT LAINNYA
+                    try {
+                        String recv = client.listenToUDP();   
+                        JSONParser parser = new JSONParser();
+                        JSONObject jsonRecv = new JSONObject();
+                        jsonRecv = (JSONObject) parser.parse(recv);
+                        if (jsonRecv.get("status").equals("ok")){
+                            // PAXOS ACCEPT PROPOSAL
+                            sent.clear();
+                            sent.put("method", "accept_proposal");
+                            sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
+                            sendData = sent.toJSONString();
+
+                            if ( port != client.player.getUDPPort()){
+                                client.sendToUDP(ipAddress, port, sendData);
+                            }
+                        }
+                    } catch (ParseException ex) {
+                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                } 
+            }
+            else { // ACCEPTOR
                 
             }
         }
@@ -345,7 +342,10 @@ public class Client extends Thread {
                 temp.put("description", "accepted");
                 temp.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
                 String sendData = temp.toJSONString();
-                this.sendToUDP(this.getPlayerAddress(Integer.parseInt((String)jsonRecv.get("player_id"))), this.getPlayerPort(Integer.parseInt((String)jsonRecv.get("player_id"))), sendData);
+                String prop = (String)jsonRecv.get("proposal_id");
+                int proposal_id = Integer.parseInt(prop.substring(prop.indexOf('(')+1, prop.indexOf(',')));
+                int player_id = Integer.parseInt(prop.substring(prop.indexOf(',')+1, prop.indexOf(')')));
+                this.sendToUDP(this.getPlayerAddress(player_id), this.getPlayerPort(player_id), sendData);
             } else if (jsonRecv.get("method").equals("accept_proposal")) {
                 if(num_proposal < 2) {
                     num_proposal++;
@@ -354,10 +354,10 @@ public class Client extends Thread {
                         String prop_1 = (String)proposal_1.get("proposal_id");
                         String prop_2 = (String)jsonRecv.get("proposal_id");
 
-                        int proposal_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf('(')+1, prop_1.indexOf(',')-1));
-                        int proposal_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf('(')+1, prop_2.indexOf(',')-1));
-                        int player_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf(',')+2, prop_1.indexOf(')')-1));
-                        int player_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf(',')+2, prop_2.indexOf(')')-1));
+                        int proposal_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf('(')+1, prop_1.indexOf(',')));
+                        int proposal_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf('(')+1, prop_2.indexOf(',')));
+                        int player_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf(',')+1, prop_1.indexOf(')')));
+                        int player_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf(',')+1, prop_2.indexOf(')')));
                         
                         if(proposal_id_1 > proposal_id_2) {
                             temp.put("status", "ok");
@@ -405,7 +405,7 @@ public class Client extends Thread {
                     }
                     else if(num_proposal == 1 && this.player.isProposer()) {
                         String proposal = (String)jsonRecv.get("proposal_id");
-                        int proposal_id = Integer.parseInt(proposal.substring(proposal.indexOf(',')+2, proposal.indexOf(')')-1));
+                        int proposal_id = Integer.parseInt(proposal.substring(proposal.indexOf(',')+1, proposal.indexOf(')')));
                         temp.put("status", "ok");
                         temp.put("description", "accepted");
                         String sendData = temp.toJSONString();
@@ -426,8 +426,8 @@ public class Client extends Thread {
     
     public String getPlayerAddress(int id) {
         for(int i = 0; i < players.size(); i++) {
-            JSONObject temp = (JSONObject)this.players.get(this.players.size()-1);
-            if(Integer.parseInt((String)temp.get("player_id")) == id) {
+            JSONObject temp = (JSONObject)this.players.get(i);
+            if(Integer.parseInt(temp.get("player_id").toString()) == id) {
                 return (String)temp.get("address");
             }
         }
@@ -436,9 +436,9 @@ public class Client extends Thread {
     
     public int getPlayerPort(int id) {
         for(int i = 0; i < players.size(); i++) {
-            JSONObject temp = (JSONObject)this.players.get(this.players.size()-1);
-            if(Integer.parseInt((String)temp.get("player_id")) == id) {
-                return Integer.parseInt((String)temp.get("port"));
+            JSONObject temp = (JSONObject)this.players.get(i);
+            if(Integer.parseInt(temp.get("player_id").toString()) == id) {
+                return (Integer)temp.get("port");
             }
         }
         return -1;
@@ -501,5 +501,6 @@ public class Client extends Thread {
             } while(!recv.get("status").equals("ok"));
         }
     }   
+    
 
 }
