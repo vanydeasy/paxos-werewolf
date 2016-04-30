@@ -76,7 +76,6 @@ public class Client extends Thread {
         //siang
         client.changePhase();
         
-        client.start();
         // GAME PLAY HERE
         
         while(true) {
@@ -116,10 +115,19 @@ public class Client extends Thread {
                 }
                 
             } else {
-                // ACCEPTOR
-                client.player.setProposer(false);
-                System.out.println("You cannot propose");
-
+                try {
+                    // ACCEPTOR
+                    client.player.setProposer(false);
+                    System.out.println("You cannot propose");
+                    String recv = client.listenToUDP();
+                    
+                    JSONParser parser = new JSONParser();
+                    JSONObject jsonRecv = new JSONObject();
+                    jsonRecv = (JSONObject) parser.parse(recv);
+                } catch (ParseException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                
             }
         }
         
@@ -155,7 +163,7 @@ public class Client extends Thread {
     }
     
     public String listenToUDP() {
-        System.out.println("Listen on port"+player.getUDPPort());
+        System.out.println("Listen on port "+player.getUDPPort());
         try {
             byte[] receiveData = new byte[1024];
             DatagramSocket serverSocket = new DatagramSocket(player.getUDPPort());
@@ -189,7 +197,7 @@ public class Client extends Thread {
         try {
             DatagramSocket datagramSocket = new DatagramSocket();
             UnreliableSender unreliableSender = new UnreliableSender(datagramSocket);
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress.substring(1)), port);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress), port);
             unreliableSender.send(sendPacket, 1.00);
         } catch (SocketException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
