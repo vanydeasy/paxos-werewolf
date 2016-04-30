@@ -304,6 +304,44 @@ public class Server extends Thread {
         return players.stream().anyMatch((temp) -> (temp.get("username").equals(username)));
     }
     
+    public void voteNow(boolean isDay) {
+        JSONObject recv;
+        do { // send method
+            JSONObject obj = new JSONObject();
+            obj.put("method","vote_now");
+            if (isDay) {
+                obj.put("phase",isDay);
+            } else {
+                obj.put("phase","night");
+            }
+            
+            send(clientSocket, obj);
+            
+            recv = (JSONObject) listen(clientSocket);
+         
+            if(!recv.get("status").equals("ok")) {
+                System.out.println(recv.toJSONString());
+            }
+        } while(!recv.get("status").equals("ok"));
+    }
+    
+    public void gameOver (String winner) {
+        JSONObject recv;
+        do { // send method
+            JSONObject obj = new JSONObject();
+            obj.put("method","game_over");
+            obj.put("phase",winner);
+            obj.put("description","HAHA"); //@TODO ubah deskripsi
+            
+            send(clientSocket, obj);   
+            recv = (JSONObject) listen(clientSocket);
+         
+            if(!recv.get("status").equals("ok")) {
+                System.out.println(recv.toJSONString());
+            }
+        } while(!recv.get("status").equals("ok"));
+    }
+    
     public int electedKPU(){
         int smallest_id = 0, candidate1_id = 0, candidate2_id = 0;
         int candidate1_count = 0, candidate2_count = 0;
