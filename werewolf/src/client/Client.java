@@ -208,8 +208,8 @@ public class Client extends Thread {
                 
                 // Mengirim data user ke server
                 obj.put("username", username);
-                obj.put("address",Inet4Address.getLocalHost().getHostAddress());
-                obj.put("port",udp_port);
+                obj.put("udp_address",Inet4Address.getLocalHost().getHostAddress());
+                obj.put("udp_port",udp_port);
                 obj.put("method","join");
                 sendToServer(obj);
                 
@@ -232,40 +232,19 @@ public class Client extends Thread {
         
         // Mendapatkan status dari server = ok
         obj = (JSONObject)listenToServer();
-        if(obj.get("status").equals("ok")) {
-            // Mendapatkan role dari server saat player sudah cukup
-            String role = (String)((JSONObject)listenToServer()).get("role");
-            System.out.println("YOUR ROLE IS "+role);
-            this.player.setRole(role);
-            if(obj.get("description") != null) {
-                System.out.println(obj.get("description"));
-            }
-        }
-        obj.clear();
-        obj.put("status", "ok");
-        sendToServer(obj);
-        // Meminta address semua klien dari server
-        obj.clear();
-        obj.put("method", "client_address");
-        sendToServer(obj);
         
-        // Menerima address semua klien dari server
-        players = (JSONArray)((JSONObject)listenToServer()).get("clients");
     }
     
     public void startGame() {
         JSONObject recv = (JSONObject)listenToServer();
         if(recv.get("method").equals("start")) {
-            isDay = (boolean) recv.get("time");
+            isDay = recv.get("time").equals("day");
             player.setRole((String) recv.get("role"));
             if(recv.get("friends")!=null)
                 friends = (ArrayList)recv.get("friends");
 
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
-            sendToServer(obj);
-            obj.clear();
-            obj.put("method","client_address");
             sendToServer(obj);
         }
         
@@ -286,7 +265,17 @@ public class Client extends Thread {
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
             sendToServer(obj);
+            obj.clear();
+            obj.put("method","client_address");
+            sendToServer(obj);
+
+            // Menerima address semua klien dari server
+            players = (JSONArray)((JSONObject)listenToServer()).get("clients");
+            obj.clear();
+            obj.put("status","ok");
+            sendToServer(obj);
         }
+        
     }
     
     public void requestListOfClients() {

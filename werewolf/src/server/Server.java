@@ -160,6 +160,10 @@ public class Server extends Thread {
                         temp.put("days", ++day);
                         temp.put("description", "PUT NARRATION HERE");
                         send(clientSocket, temp);
+                        JSONObject status = (JSONObject)listen(clientSocket);
+                        if(status.get("status").equals("ok")) { 
+                            //SUCCESS
+                        }
                     } else {
                         // start game unseccesful (mau diapain yah enaknya)
                     }
