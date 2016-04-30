@@ -47,7 +47,7 @@ public class Client extends Thread {
     private int day = 0;
     
     public Client() {
-        SERVER_HOSTNAME = "192.168.0.104";
+        SERVER_HOSTNAME = "127.0.0.1";
         COMM_PORT = 8181;
     }
     
@@ -171,6 +171,7 @@ public class Client extends Thread {
             serverSocket.receive(receivePacket);
             String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
             System.out.println("Received from UDP: "+sentence);
+            serverSocket.close();
             return sentence;
         } catch (IOException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
@@ -199,6 +200,7 @@ public class Client extends Thread {
             UnreliableSender unreliableSender = new UnreliableSender(datagramSocket);
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress), port);
             unreliableSender.send(sendPacket, 1.00);
+            datagramSocket.close();
         } catch (SocketException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         }
