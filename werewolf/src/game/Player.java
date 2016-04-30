@@ -16,8 +16,8 @@ public class Player implements Serializable {
     private String player_name;
     private String player_role;
     
+    private String udp_address;
     private int udp_port;
-    private int udp_ip;
     
     private boolean proposer;
     private int kpu_id;
@@ -27,10 +27,11 @@ public class Player implements Serializable {
     
     private int proposal_id;
     
-    public Player(int id, String name, int port) {
+    public Player(int id, String name, String address, int port) {
         player_id = id;
         player_name = name;
         player_role = new String ("undefined");
+        udp_address = address;
         udp_port = port;
         state = true;
         isReady = false;    //ini gatau true pas kapan
@@ -65,8 +66,8 @@ public class Player implements Serializable {
         return udp_port; 
     }
     
-    public int getUDPIP() {
-        return udp_ip; 
+    public String getUDPAddress() {
+        return udp_address; 
     }
     
     public int getKPUID() {
@@ -103,6 +104,14 @@ public class Player implements Serializable {
     
     public void setProposalID(int new_proposal_id) {
         proposal_id = new_proposal_id;
+    }
+    
+    public void setUDPPort(int port) {
+        udp_port = port;
+    }
+    
+    public void setUDPAddress(String address) {
+        udp_address = address;
     }
     
 }
