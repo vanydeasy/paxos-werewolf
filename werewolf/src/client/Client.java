@@ -444,6 +444,21 @@ public class Client extends Thread {
         return -1;
     }
     
+    public void acceptedProposal(int kpu_id) {
+        JSONObject recv = (JSONObject)listenToServer();
+        do { // send method
+            JSONObject obj = new JSONObject();
+            obj.put("method", "accepted_proposal");
+            obj.put("kpu_id",kpu_id);
+            obj.put("description", "Kpu is selected");
+            
+            sendToServer(obj);
+            if(!recv.get("status").equals("ok")) {
+                System.out.println(recv.toJSONString());
+            }
+        } while(!recv.get("status").equals("ok"));
+    }
+    
     public void werewolfKilled() {
         //ini uda pake udp-an
     }
