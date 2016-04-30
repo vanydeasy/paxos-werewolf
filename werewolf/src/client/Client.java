@@ -432,5 +432,63 @@ public class Client extends Thread {
         }
         return -1;
     }
+    
+    public void werewolfKilled() {
+        //ini uda pake udp-an
+    }
+    
+    public void playerKilledInfo(int vote_status, int player_killed) {
+        JSONObject recv = (JSONObject)listenToServer();
+        if (this.player.getID() == this.player.getKPUID()) {
+            do { // send method
+                JSONObject obj = new JSONObject();
+                obj.put("method","vote_result_werewolf");
+                obj.put("vote_status",vote_status);
+                if (vote_status == 1) {
+                        obj.put("player_killed", player_killed); //Gatau ini buat apaa	
+                }
+
+                for (int i=0; i<player_killed; i++) {
+
+                }
+
+            //    obj.put("player_killed", ); Gatau ini buat apaa
+
+                sendToServer(obj);
+                if(!recv.get("status").equals("ok")) {
+                    System.out.println(recv.toJSONString());
+                }
+            } while(!recv.get("status").equals("ok"));
+        }
+    }
+
+    public void civilianKilled() {
+        //pake udp
+    }
+
+    public void civilianKilledInfo(int vote_status, int player_killed) {
+        JSONObject recv = (JSONObject)listenToServer();
+        if (this.player.getID() == this.player.getKPUID()) {
+            do { // send method
+                JSONObject obj = new JSONObject();
+                obj.put("method","vote_result_civilian");
+                obj.put("vote_status",vote_status);
+                if (vote_status == 1) {
+                        obj.put("player_killed", player_killed); //Gatau ini buat apaa	
+                }
+
+                for (int i=0; i<player_killed; i++) {
+
+                }
+
+            //    obj.put("player_killed", ); Gatau ini buat apaa
+
+                sendToServer(obj);
+                if(!recv.get("status").equals("ok")) {
+                    System.out.println(recv.toJSONString());
+                }
+            } while(!recv.get("status").equals("ok"));
+        }
+    }   
 
 }
