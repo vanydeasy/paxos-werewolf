@@ -91,6 +91,7 @@ public class Client extends Thread {
                 // PAXOS PREPARE PROPOSAL
                 JSONObject sent = new JSONObject();
                 sent.put("method", "prepare_proposal");
+                client.player.setProposalID(client.player.getProposalID()+1);
                 sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
                 String sendData = sent.toJSONString();
 
