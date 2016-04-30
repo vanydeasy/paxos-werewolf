@@ -54,12 +54,6 @@ public class Server extends Thread {
     }
     
     public static void main(String[] args) {
-        try {
-            System.out.println(Inet4Address.getLocalHost().getHostAddress());
-        } catch (UnknownHostException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        
         // Create server socket
         try {
             serverSocket = new ServerSocket(COMM_PORT, 0, InetAddress.getLocalHost());
@@ -91,159 +85,161 @@ public class Server extends Thread {
             Object recv = listen(clientSocket);
             jsonRecv = (JSONObject)recv;
             temp.clear();
-            if(jsonRecv.get("method").equals("join")) {
-                if (!isPlaying){
-                    if(!isUsernameExist((String)jsonRecv.get("username"))) {
-                        temp.put("username", jsonRecv.get("username"));
-                        player_id = playerCount;
-                        temp.put("player_id", player_id);
-                        send(clientSocket, temp);
-                        temp.put("is_alive", 1);
-                        temp.put("address",jsonRecv.get("udp_address"));
-                        temp.put("port",(Integer)jsonRecv.get("udp_port"));
-                        players.add(temp);
-                        randomizeRole(player_id);
-                        System.out.println("\nClient Counter: "+ ++clientCount);
-                        ++playerCount;
+            String method = (String)jsonRecv.get("method");
+            if(method != null) {
+                if(jsonRecv.get("method").equals("join")) {
+                    if (!isPlaying){
+                        if(!isUsernameExist((String)jsonRecv.get("username"))) {
+                            temp.put("username", jsonRecv.get("username"));
+                            player_id = playerCount;
+                            temp.put("player_id", player_id);
+                            send(clientSocket, temp);
+                            temp.put("is_alive", 1);
+                            temp.put("address",jsonRecv.get("udp_address"));
+                            temp.put("port",(Integer)jsonRecv.get("udp_port"));
+                            players.add(temp);
+                            randomizeRole(player_id);
+                            System.out.println("\nClient Counter: "+ ++clientCount);
+                            ++playerCount;
+                        }
+                        else {
+                            temp.put("status", "fail");
+                            temp.put("description", "user exists");
+                            send(clientSocket, temp);
+                        }
                     }
                     else {
-                        temp.put("status", "fail");
-                        temp.put("description", "user exists");
-                        send(clientSocket, temp);
+                        temp.put("status","fail");
+                        temp.put("description", "please wait, game is currently running");
                     }
                 }
-                else {
-                    temp.put("status","fail");
-                    temp.put("description", "please wait, game is currently running");
-                }
-            }
-            else if(jsonRecv.get("method").equals("ready")) {
-                temp.put("status","ok");
-                temp.put("description","waiting for other player to start");
-                send(clientSocket, temp);
-                System.out.println("\nReady Counter: "+ ++readyCount);
-                
-                while (readyCount < clientCount || clientCount < PLAYER_TO_PLAY){
-                    // keep on waiting
-                    System.out.print("");
-                }
-                
-                // when everyone is ready and the game hasn't started yet
-                if (readyCount == clientCount && !isPlaying && clientCount >= PLAYER_TO_PLAY) {   
-                    // START GAME
-                    isPlaying = true;
-                    day++;
-                    temp.put("method","start");
-                    temp.put("time", "night");
-                    temp.put("description", "game is started");
-                    temp.put("role",roles.get(player_id));
-                    if (roles.get(player_id).equals("werewolf")){
-                        ArrayList<String> friends = new ArrayList<>();
-                        for (int i=0; i<clientCount; i++){
-                            if (roles.get(i).equals("werewolf") && i!=player_id){
-                                String p = (String) players.get(i).get("username");
-                                friends.add(p);
+                else if(jsonRecv.get("method").equals("ready")) {
+                    temp.put("status","ok");
+                    temp.put("description","waiting for other player to start");
+                    send(clientSocket, temp);
+                    System.out.println("\nReady Counter: "+ ++readyCount);
+
+                    while (readyCount < clientCount || clientCount < PLAYER_TO_PLAY){
+                        // keep on waiting
+                        System.out.print("");
+                    }
+
+                    // when everyone is ready and the game hasn't started yet
+                    if (readyCount == clientCount && !isPlaying && clientCount >= PLAYER_TO_PLAY) {   
+                        // START GAME
+                        isPlaying = true;
+                        day++;
+                        temp.put("method","start");
+                        temp.put("time", "night");
+                        temp.put("description", "game is started");
+                        temp.put("role",roles.get(player_id));
+                        if (roles.get(player_id).equals("werewolf")){
+                            ArrayList<String> friends = new ArrayList<>();
+                            for (int i=0; i<clientCount; i++){
+                                if (roles.get(i).equals("werewolf") && i!=player_id){
+                                    String p = (String) players.get(i).get("username");
+                                    friends.add(p);
+                                }
                             }
+                            temp.put("friends", friends);
                         }
-                        temp.put("friends", friends);
+                        send(clientSocket, temp);
+
+                        Object recv_status_start = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_start;
+                        if(jsonRecv.get("status").equals("ok")) { // successfully start the game
+                            // CHANGE PHASE
+                            isDay = true;
+                            temp.clear();
+                            temp.put("method", "change_phase");
+                            temp.put("time", "day");
+                            temp.put("days", ++day);
+                            temp.put("description", "PUT NARRATION HERE");
+                            send(clientSocket, temp);
+                            JSONObject status = (JSONObject)listen(clientSocket);
+                            if(status.get("status").equals("ok")) { 
+                                //SUCCESS
+                            }
+                        } else {
+                            // start game unseccesful (mau diapain yah enaknya)
+                        }
+                    }
+                }
+                else if(jsonRecv.get("method").equals("client_address")) {
+                    if (isPlaying) {
+                        temp.put("status", "ok");
+                        JSONArray playerJSON = new JSONArray();
+                        playerJSON.addAll(players);
+                        temp.put("clients", playerJSON);
+                        temp.put("description", "list of clients retrieved");
+                    } else {
+                        temp.put("status", "fail");
+                        temp.put("description", "the game hasn't started yet");
+                    }
+                    send(clientSocket, temp);
+                }
+                else if (jsonRecv.get("method").equals("prepare_proposal")){
+                    if (!isPlaying){
+                        temp.put("status", "fail");
+                        temp.put("description", "the game hasn't started yet");
+                    } else if ((Integer)jsonRecv.get("kpu_id") > players.size()-1) {
+                        temp.put("status", "fail");
+                        temp.put("description", "player_id doesn't exist");
+                    } else {
+                        temp.put("status", "ok");
+                        temp.put("description", "proposal recieved");
+                        proposed_kpu_id.put(player_id, (Integer)jsonRecv.get("kpu_id"));
                     }
                     send(clientSocket, temp);
 
-                    Object recv_status_start = listen(clientSocket);
-                    jsonRecv = (JSONObject)recv_status_start;
-                    if(jsonRecv.get("status").equals("ok")) { // successfully start the game
-                        // CHANGE PHASE
-                        isDay = true;
-                        temp.clear();
-                        temp.put("method", "change_phase");
-                        temp.put("time", "day");
-                        temp.put("days", ++day);
-                        temp.put("description", "PUT NARRATION HERE");
-                        send(clientSocket, temp);
-                        JSONObject status = (JSONObject)listen(clientSocket);
-                        if(status.get("status").equals("ok")) { 
-                            //SUCCESS
-                        }
-                    } else {
-                        // start game unseccesful (mau diapain yah enaknya)
+                    while (proposed_kpu_id.size() < playerCount){
+                        // keep on waiting
+                        System.out.print("");
                     }
-                }
-            }
-            else if(jsonRecv.get("method").equals("client_address")) {
-                if (isPlaying) {
-                    temp.put("status", "ok");
-                    JSONArray playerJSON = new JSONArray();
-                    playerJSON.addAll(players);
-                    temp.put("clients", playerJSON);
-                    temp.put("description", "list of clients retrieved");
-                } else {
-                    temp.put("status", "fail");
-                    temp.put("description", "the game hasn't started yet");
-                }
-                send(clientSocket, temp);
-            }
-            else if (jsonRecv.get("method").equals("prepare_proposal")){
-                if (!isPlaying){
-                    temp.put("status", "fail");
-                    temp.put("description", "the game hasn't started yet");
-                } else if ((Integer)jsonRecv.get("kpu_id") > players.size()-1) {
-                    temp.put("status", "fail");
-                    temp.put("description", "player_id doesn't exist");
-                } else {
-                    temp.put("status", "ok");
-                    temp.put("description", "proposal recieved");
-                    proposed_kpu_id.put(player_id, (Integer)jsonRecv.get("kpu_id"));
-                }
-                send(clientSocket, temp);
-                
-                while (proposed_kpu_id.size() < playerCount){
-                    // keep on waiting
-                    System.out.print("");
-                }
-                
-                // every active palyer has proposed a leader
-                // INCLUDING the proposers themselves
-                if (proposed_kpu_id.size() == playerCount){ 
-                    int kpu_id = electedKPU();
-                    /* TODO: KALO HASIL PEMILU SERI (kpu_id = -1) BELOM DITANGANI */
-                    temp.clear();
-                    if (kpu_id == proposed_kpu_id.get(player_id)){
+
+                    // every active palyer has proposed a leader
+                    // INCLUDING the proposers themselves
+                    if (proposed_kpu_id.size() == playerCount){ 
+                        int kpu_id = electedKPU();
+                        /* TODO: KALO HASIL PEMILU SERI (kpu_id = -1) BELOM DITANGANI */
+                        temp.clear();
+                        if (kpu_id == proposed_kpu_id.get(player_id)){
+                            temp.put("status", "ok");
+                            temp.put("description", "the KPU candidate you voted for has been elected");
+                        } else {
+                            temp.put("status", "fail");
+                            temp.put("description", "the other KPU candidate has been elected");
+                        }
+                        send(clientSocket, temp);
+                    }
+
+                } else if (jsonRecv.get("method").equals("vote_result_werewolf")) {
+                    if (!isPlaying){
+                        temp.put("status", "fail");
+                        temp.put("description", "the game hasn't started yet");
+                    } else {
                         temp.put("status", "ok");
-                        temp.put("description", "the KPU candidate you voted for has been elected");
+                        temp.put("description", "vote result for werewolf recieved");
+                    }
+                } else if (jsonRecv.get("method").equals("vote_result_civillian")) {
+                    if (!isPlaying){
+                        temp.put("status", "fail");
+                        temp.put("description", "the game hasn't started yet");
+                    } else {
+                        temp.put("status", "ok");
+                        temp.put("description", "vote result for civillian recieved");
+                    }
+                } else if (jsonRecv.get("method").equals("vote_result")) {
+                    if (!isPlaying){
+                        temp.put("status", "fail");
+                        temp.put("description", "the game hasn't started yet");
                     } else {
                         temp.put("status", "fail");
-                        temp.put("description", "the other KPU candidate has been elected");
+                        temp.put("description", "no one is killed");
                     }
-                    send(clientSocket, temp);
                 }
-                
-            } else if (jsonRecv.get("method").equals("vote_result_werewolf")) {
-                if (!isPlaying){
-                    temp.put("status", "fail");
-                    temp.put("description", "the game hasn't started yet");
-                } else {
-                    temp.put("status", "ok");
-                    temp.put("description", "vote result for werewolf recieved");
-                }
-            } else if (jsonRecv.get("method").equals("vote_result_civillian")) {
-                if (!isPlaying){
-                    temp.put("status", "fail");
-                    temp.put("description", "the game hasn't started yet");
-                } else {
-                    temp.put("status", "ok");
-                    temp.put("description", "vote result for civillian recieved");
-                }
-            } else if (jsonRecv.get("method").equals("vote_result")) {
-                if (!isPlaying){
-                    temp.put("status", "fail");
-                    temp.put("description", "the game hasn't started yet");
-                } else {
-                    temp.put("status", "fail");
-                    temp.put("description", "no one is killed");
-                }
+                isLeave = method.equals("leave");
             }
-            String method = (String)jsonRecv.get("method");
-            if(method != null) isLeave = method.equals("leave");
         } while(!isLeave);
         
         JSONObject leave = new JSONObject();

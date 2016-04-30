@@ -75,10 +75,9 @@ public class Client extends Thread {
         
         //siang
         client.changePhase();
-            
+        
+        client.start();
         // GAME PLAY HERE
-        // client.start();
-        // while belum menang
         
         while(true) {
             System.out.println("START GAME");
@@ -102,6 +101,8 @@ public class Client extends Thread {
                     client.sendToUDP(ipAddress, port, sendData);
                 }
 
+                // INI HARUSNYA NUNGGU DI OK DARI CLIENT DULU
+                
                 // PAXOS ACCEPT PROPOSAL
                 sent.clear();
                 sent.put("method", "accept_proposal");
@@ -313,7 +314,7 @@ public class Client extends Thread {
     @Override
     public void run() {
         // Used for listening to socket
-        System.out.println ("New Communication Thread Started");
+        System.out.println ("ON START");
         
         JSONObject proposal_1 = null;
         int num_proposal = 0;
