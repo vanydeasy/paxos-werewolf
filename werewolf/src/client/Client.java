@@ -33,7 +33,7 @@ import org.json.simple.parser.ParseException;
  *
  * @author vanyadeasy
  */
-public class Client extends Thread {
+public class Client implements Runnable {
     // FOR TCP CONNECTION
     private Socket socket;
     public String SERVER_HOSTNAME;
@@ -73,20 +73,19 @@ public class Client extends Thread {
         //mulai game malam, werewolf saling kenal
         client.startGame();
         System.out.println("START GAME");
-        client.start();
         
         //siang
         client.changePhase();
         
         // GAME PLAY HERE
         
-        while(true) {                      
+        while(true) {
             if(client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
                 || client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
                 // PROPOSER pid dua terbesar (player ke n dan n­1) 
                 client.player.setProposer(true);
 
-                System.out.println("You can propose");
+                System.out.println("\nYou can propose");
 
                 // PAXOS PREPARE PROPOSAL
                 JSONObject sent = new JSONObject();
@@ -94,37 +93,64 @@ public class Client extends Thread {
                 sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
                 String sendData = sent.toJSONString();
 
+                Thread t1 = new Thread(client);
+                t1.start();
+                
                 for(int i=0;i<client.players.size();i++) {
                     String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
                     int port = (Integer)((JSONObject)client.players.get(i)).get("port");
                     if ( port != client.player.getUDPPort()){
                         client.sendToUDP(ipAddress, port, sendData);
                     }
-                    
-                    // NUNGGU JAWABAN "OK" DARI CLIENT LAINNYA
-                    try {
-                        String recv = client.listenToUDP();   
-                        JSONParser parser = new JSONParser();
-                        JSONObject jsonRecv = new JSONObject();
-                        jsonRecv = (JSONObject) parser.parse(recv);
-                        if (jsonRecv.get("status").equals("ok")){
-                            // PAXOS ACCEPT PROPOSAL
-                            sent.clear();
-                            sent.put("method", "accept_proposal");
-                            sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
-                            sendData = sent.toJSONString();
-
-                            if ( port != client.player.getUDPPort()){
-                                client.sendToUDP(ipAddress, port, sendData);
-                            }
-                        }
-                    } catch (ParseException ex) {
-                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                } 
-            }
-            else { // ACCEPTOR
+                }
                 
+                try {
+                    t1.join();
+                    System.out.println("Thread died");
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                
+                Thread t2 = new Thread(client);
+                t2.start();
+                
+                sent.clear();
+                sent.put("method", "accept_proposal");
+                sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
+                sendData = sent.toJSONString();
+                for(int i=0;i<client.players.size();i++) {
+                    // PAXOS ACCEPT PROPOSAL
+                    String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
+                    int port = (Integer)((JSONObject)client.players.get(i)).get("port");
+                    if ( port != client.player.getUDPPort()){
+                        client.sendToUDP(ipAddress, port, sendData);
+                    }
+                }
+                
+                try {
+                    t2.join();
+                    System.out.println("Thread died");
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                
+            }
+            else {
+                try {
+                    // ACCEPTOR
+                    System.out.println("\nYou cannot propose");
+                    Thread t1 = new Thread(client);
+                    t1.start();
+
+                    t1.join();
+                    
+                    Thread t2 = new Thread(client);
+                    t2.start();
+
+                    t2.join();
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         }
         
@@ -321,13 +347,14 @@ public class Client extends Thread {
     @Override
     public void run() {
         // Used for listening to socket
-        System.out.println ("ON START");
+        System.out.println ("Running the listening thread");
         
-        JSONObject proposal_1 = null;
-        int num_proposal = 0;
-        do {
+        for(int i = 0; i < this.players.size()-1; i++) {
+            JSONObject proposal_1 = null;
+            int num_proposal = 0;
+
             String recv = listenToUDP();
-            
+
             JSONParser parser = new JSONParser();
             JSONObject jsonRecv = new JSONObject();
             try {
@@ -335,93 +362,93 @@ public class Client extends Thread {
             } catch (ParseException ex) {
                 Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
             }
-            
+
             JSONObject temp = new JSONObject();
-            if(jsonRecv.get("method").equals("prepare_proposal")){
-                temp.put("status", "ok");
-                temp.put("description", "accepted");
-                temp.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
-                String sendData = temp.toJSONString();
-                String prop = (String)jsonRecv.get("proposal_id");
-                int proposal_id = Integer.parseInt(prop.substring(prop.indexOf('(')+1, prop.indexOf(',')));
-                int player_id = Integer.parseInt(prop.substring(prop.indexOf(',')+1, prop.indexOf(')')));
-                this.sendToUDP(this.getPlayerAddress(player_id), this.getPlayerPort(player_id), sendData);
-            } else if (jsonRecv.get("method").equals("accept_proposal")) {
-                if(num_proposal < 2) {
-                    num_proposal++;
+            if(jsonRecv.get("method") != null) {
+                if(jsonRecv.get("method").equals("prepare_proposal")){
+                    temp.put("status", "ok");
+                    temp.put("description", "accepted");
+                    temp.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
+                    String sendData = temp.toJSONString();
+                    String prop = (String)jsonRecv.get("proposal_id");
+                    int proposal_id = Integer.parseInt(prop.substring(prop.indexOf('(')+1, prop.indexOf(',')));
+                    int player_id = Integer.parseInt(prop.substring(prop.indexOf(',')+1, prop.indexOf(')')));
+                    this.sendToUDP(this.getPlayerAddress(player_id), this.getPlayerPort(player_id), sendData);
+                } else if (jsonRecv.get("method").equals("accept_proposal")) {
+                    if(num_proposal < 2) {
+                        num_proposal++;
 
-                    if(num_proposal == 2 && !this.player.isProposer()) {
-                        String prop_1 = (String)proposal_1.get("proposal_id");
-                        String prop_2 = (String)jsonRecv.get("proposal_id");
+                        if(num_proposal == 2 && !this.player.isProposer()) {
+                            String prop_1 = (String)proposal_1.get("proposal_id");
+                            String prop_2 = (String)jsonRecv.get("proposal_id");
 
-                        int proposal_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf('(')+1, prop_1.indexOf(',')));
-                        int proposal_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf('(')+1, prop_2.indexOf(',')));
-                        int player_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf(',')+1, prop_1.indexOf(')')));
-                        int player_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf(',')+1, prop_2.indexOf(')')));
-                        
-                        if(proposal_id_1 > proposal_id_2) {
-                            temp.put("status", "ok");
-                            temp.put("description", "accepted");
-                            String sendData = temp.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
-                            temp.clear();
-                            temp.put("status", "fail");
-                            temp.put("description", "rejected");
-                            sendData = temp.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
-                        }
-                        else if(proposal_id_1 < proposal_id_2) {
-                            temp.put("status", "ok");
-                            temp.put("description", "accepted");
-                            String sendData = temp.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
-                            temp.clear();
-                            temp.put("status", "fail");
-                            temp.put("description", "rejected");
-                            sendData = temp.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
-                        }
-                        else { //proposal_id_1 == proposal_id_2
-                            if(player_id_1 < player_id_2) {
-                                int temp_id = player_id_1;
-                                player_id_1 = player_id_2;
-                                player_id_2 = temp_id;
+                            int proposal_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf('(')+1, prop_1.indexOf(',')));
+                            int proposal_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf('(')+1, prop_2.indexOf(',')));
+                            int player_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf(',')+1, prop_1.indexOf(')')));
+                            int player_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf(',')+1, prop_2.indexOf(')')));
+
+                            if(proposal_id_1 > proposal_id_2) {
+                                temp.put("status", "ok");
+                                temp.put("description", "accepted");
+                                String sendData = temp.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
+                                temp.clear();
+                                temp.put("status", "fail");
+                                temp.put("description", "rejected");
+                                sendData = temp.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
                             }
+                            else if(proposal_id_1 < proposal_id_2) {
+                                temp.put("status", "ok");
+                                temp.put("description", "accepted");
+                                String sendData = temp.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
+                                temp.clear();
+                                temp.put("status", "fail");
+                                temp.put("description", "rejected");
+                                sendData = temp.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
+                            }
+                            else { //proposal_id_1 == proposal_id_2
+                                if(player_id_1 < player_id_2) {
+                                    int temp_id = player_id_1;
+                                    player_id_1 = player_id_2;
+                                    player_id_2 = temp_id;
+                                }
+                                temp.put("status", "ok");
+                                temp.put("description", "accepted");
+                                String sendData = temp.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
+                                temp.clear();
+                                temp.put("status", "fail");
+                                temp.put("description", "rejected");
+                                sendData = temp.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
+                            }
+                            proposal_1 = null;
+
+                        }
+                        else if(num_proposal == 1 && !this.player.isProposer()) {
+                            proposal_1 = jsonRecv;
+                        }
+                        else if(num_proposal == 1 && this.player.isProposer()) {
+                            String proposal = (String)jsonRecv.get("proposal_id");
+                            int proposal_id = Integer.parseInt(proposal.substring(proposal.indexOf(',')+1, proposal.indexOf(')')));
                             temp.put("status", "ok");
                             temp.put("description", "accepted");
                             String sendData = temp.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
+                            this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
                             temp.clear();
                             temp.put("status", "fail");
                             temp.put("description", "rejected");
                             sendData = temp.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
+                            this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
                         }
-                        proposal_1 = null;
+                    }
 
-                    }
-                    else if(num_proposal == 1 && !this.player.isProposer()) {
-                        proposal_1 = jsonRecv;
-                    }
-                    else if(num_proposal == 1 && this.player.isProposer()) {
-                        String proposal = (String)jsonRecv.get("proposal_id");
-                        int proposal_id = Integer.parseInt(proposal.substring(proposal.indexOf(',')+1, proposal.indexOf(')')));
-                        temp.put("status", "ok");
-                        temp.put("description", "accepted");
-                        String sendData = temp.toJSONString();
-                        this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
-                        temp.clear();
-                        temp.put("status", "fail");
-                        temp.put("description", "rejected");
-                        sendData = temp.toJSONString();
-                        this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
-                    }
                 }
-
             }
-            
-        } while (true);
-        
+        }
     }
     
     public String getPlayerAddress(int id) {
