@@ -46,6 +46,8 @@ public class Client implements Runnable {
     private boolean isDay;
     private int day = 0;
     
+    private List<Integer> votes = new ArrayList<Integer>();
+    
     public Client() {
         SERVER_HOSTNAME = "127.0.0.1";
         COMM_PORT = 8181;
@@ -78,7 +80,6 @@ public class Client implements Runnable {
         client.changePhase();
         
         // GAME PLAY HERE
-        
         while(true) {
             if(client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
                 || client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
@@ -90,6 +91,7 @@ public class Client implements Runnable {
                 // PAXOS PREPARE PROPOSAL
                 JSONObject sent = new JSONObject();
                 sent.put("method", "prepare_proposal");
+                client.player.setProposalID(client.player.getProposalID()+1);
                 sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
                 String sendData = sent.toJSONString();
 
@@ -484,6 +486,29 @@ public class Client implements Runnable {
                 System.out.println(recv.toJSONString());
             }
         } while(!recv.get("status").equals("ok"));
+    }
+    
+    public int getVoteResult() {
+        
+        int killed_player = -1;
+        int voteCounter = 0;
+        boolean valid = true;
+       
+        for (int i=0; i<votes.size(); i++) {
+            if (votes.get(i) == voteCounter) {
+                valid = false;
+            } else if (votes.get(i) > voteCounter) {
+                killed_player = i;
+                voteCounter = votes.get(i);
+                valid = true;
+            }
+        }
+        
+        if (!valid) {
+            killed_player = -1;
+        }
+        
+        return killed_player;            
     }
     
     public void werewolfKilled() {
