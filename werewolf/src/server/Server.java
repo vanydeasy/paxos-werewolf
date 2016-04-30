@@ -168,22 +168,6 @@ public class Server extends Thread {
                         // start game unseccesful (mau diapain yah enaknya)
                     }
                 }
-
-                // every active palyer has proposed a leader
-                // INCLUDING the proposers themselves
-                if (proposed_kpu_id.size() == playerCount){ 
-                    int kpu_id = electedKPU();
-                    /* TODO: KALO HASIL PEMILU SERI (kpu_id = -1) BELOM DITANGANI */
-                    temp.clear();
-                    if (kpu_id == proposed_kpu_id.get(player_id)){
-                        temp.put("status", "ok");
-                        temp.put("description", "the KPU candidate you voted for has been elected");
-                    } else {
-                        temp.put("status", "fail");
-                        temp.put("description", "the other KPU candidate has been elected");
-                    }
-                    send(clientSocket, temp);
-                }
             }
             else if(jsonRecv.get("method").equals("client_address")) {
                 if (isPlaying) {
@@ -211,6 +195,28 @@ public class Server extends Thread {
                     proposed_kpu_id.put(player_id, (Integer)jsonRecv.get("kpu_id"));
                 }
                 send(clientSocket, temp);
+                
+                while (proposed_kpu_id.size() < playerCount){
+                    // keep on waiting
+                    System.out.print("");
+                }
+                
+                // every active palyer has proposed a leader
+                // INCLUDING the proposers themselves
+                if (proposed_kpu_id.size() == playerCount){ 
+                    int kpu_id = electedKPU();
+                    /* TODO: KALO HASIL PEMILU SERI (kpu_id = -1) BELOM DITANGANI */
+                    temp.clear();
+                    if (kpu_id == proposed_kpu_id.get(player_id)){
+                        temp.put("status", "ok");
+                        temp.put("description", "the KPU candidate you voted for has been elected");
+                    } else {
+                        temp.put("status", "fail");
+                        temp.put("description", "the other KPU candidate has been elected");
+                    }
+                    send(clientSocket, temp);
+                }
+                
             } else if (jsonRecv.get("method").equals("vote_result_werewolf")) {
                 if (!isPlaying){
                     temp.put("status", "fail");
