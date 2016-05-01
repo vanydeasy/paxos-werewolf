@@ -109,15 +109,7 @@ public class Server extends Thread {
                         Object recv_status_phase = listen(clientSocket);
                         jsonRecv = (JSONObject)recv_status_phase;
                         if(jsonRecv.get("status").equals("ok")) { // success
-                            voteNow("night");
-                            
-                            Object recv_status_vote = listen(clientSocket);
-                            jsonRecv = (JSONObject)recv_status_vote;
-                            if(jsonRecv.get("status").equals("ok")) { 
-                                setVoteResponded(player_id);
-                            } else {
-                                // TODO : vote now unsuccesful
-                            }
+                            setVoteResponded(player_id);
                         } else {
                             // TODO: change phase into night unsuccessful
                         }
@@ -127,27 +119,35 @@ public class Server extends Thread {
                         day_vote++;
                         if (day_vote < 2){ // voting done less than 2 times
                             voteNow("day");
+                            
+                            Object recv_status_vote = listen(clientSocket);
+                            jsonRecv = (JSONObject)recv_status_vote;
+                            if(jsonRecv.get("status").equals("ok")) { 
+                                setVoteResponded(player_id);
+                            } else {
+                                // TODO : vote now unsuccesful
+                            }
                         } else {
                             changePhase();
 
                             Object recv_status_phase = listen(clientSocket);
                             jsonRecv = (JSONObject)recv_status_phase;
-                            if(jsonRecv.get("status").equals("ok")) { // success
-                                voteNow("night");
+                            if(jsonRecv.get("status").equals("ok")) { 
+                                setVoteResponded(player_id);
                             } else {
                                 // TODO: change phase into night unsuccessful
                             }
                         }
                     } else {
                         voteNow("night");
-                    }
-
-                    Object recv_status_vote = listen(clientSocket);
-                    jsonRecv = (JSONObject)recv_status_vote;
-                    if(jsonRecv.get("status").equals("ok")) { 
-                        setVoteResponded(player_id);
-                    } else {
-                        // TODO : vote now unsuccesful
+                        
+                        Object recv_status_vote = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_vote;
+                        if(jsonRecv.get("status").equals("ok")) { 
+                            setVoteResponded(player_id);
+                        } else {
+                            // TODO : vote now unsuccesful
+                        }
                     }
                 }
             }
@@ -243,6 +243,18 @@ public class Server extends Thread {
                         temp.put("description", "the game hasn't started yet");
                     }
                     send(clientSocket, temp);
+                    
+                    if (!isDay){
+                        voteNow("night");
+                        
+                        Object recv_status_phase = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_phase;
+                        if(jsonRecv.get("status").equals("ok")) { 
+                            // success
+                        } else {
+                            // TODO: vote now unsuccessful
+                        }
+                    }
                 }
                 else if (jsonRecv.get("method").equals("accepted_proposal")){
                     if (!isPlaying){
