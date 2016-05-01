@@ -255,9 +255,9 @@ public class Server extends Thread {
                         
                         for (int i = 0; i < players.size(); i++){
                             if (getAliveWerewolfNumber() == 0){
-                                gameOver("werewolf");
+                                gameOver("werewolf", client_socket.get(i));
                             } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
-                                gameOver("civilian");
+                                gameOver("civilian", client_socket.get(i));
                             } else {
                                 changePhase("day", client_socket.get(i));
                             }
@@ -282,9 +282,9 @@ public class Server extends Thread {
                         
                         for (int i = 0; i < players.size(); i++){
                             if (getAliveWerewolfNumber() == 0){
-                                gameOver("werewolf");
+                                gameOver("werewolf", client_socket.get(i));
                             } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
-                                gameOver("civilian");
+                                gameOver("civilian", client_socket.get(i));
                             } else {
                                 changePhase("night", client_socket.get(i));
                             }
@@ -311,9 +311,9 @@ public class Server extends Thread {
                                     voteNow("day", client_socket.get(i));
                                 } else {
                                     if (getAliveWerewolfNumber() == 0){
-                                        gameOver("werewolf");
+                                        gameOver("werewolf", client_socket.get(i));
                                     } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
-                                        gameOver("civilian");
+                                        gameOver("civilian", client_socket.get(i));
                                     } else {
                                         changePhase("night", client_socket.get(i));
                                     }
@@ -393,12 +393,12 @@ public class Server extends Thread {
         return players.stream().anyMatch((temp) -> (temp.get("username").equals(username)));
     }
     
-    public void gameOver (String winner) {
+    public void gameOver (String winner, Socket socket) {
         JSONObject obj = new JSONObject();
         obj.put("method","game_over");
         obj.put("winner",winner);
         obj.put("description","");
-        send(clientSocket, obj);
+        send(socket, obj);
     }
     
     public int getDeadPlayers() {
