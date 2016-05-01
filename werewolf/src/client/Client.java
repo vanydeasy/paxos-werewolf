@@ -48,7 +48,7 @@ public class Client implements Runnable {
     private boolean isDay; // return true when day
     private int day = 0; // number of days
     
-    private List<Integer> votes = new ArrayList<Integer>();
+    private List<Integer> votes = new ArrayList<>();
     
     public Client() {
         SERVER_HOSTNAME = "127.0.0.1";
@@ -151,6 +151,9 @@ public class Client implements Runnable {
                     Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
+            
+            client.vote();
+            
             break;
         }
         
@@ -312,7 +315,7 @@ public class Client implements Runnable {
             sendToServer(obj);
 
             // Menerima address semua klien dari server
-            players = (JSONArray)((JSONObject)listenToServer()).get("clients");
+            requestListOfClients();
         }
         
     }
@@ -477,6 +480,10 @@ public class Client implements Runnable {
                         }
                     }
                 }
+                else if(jsonRecv.get("method").equals("vote_civilian")) {
+                    votes.add(Integer.parseInt(jsonRecv.get("player_id").toString()));
+                    if(Client.players.size()-1 == i) break;
+                }
             }
         }
     }
@@ -597,5 +604,83 @@ public class Client implements Runnable {
         }
     }   
     
+    public int getIDFromUsername(String username) {
+        for(int i=0; i<players.size(); i++) {
+            try {
+                JSONParser parser = new JSONParser();
+                
+                JSONObject data = (JSONObject)parser.parse(players.get(i).toString());
+                if(data.get("username").equals(username)) {
+                    return Integer.parseInt(data.get("player_id").toString());
+                }
+            
+            } catch (ParseException ex) {
+                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        return -1;
+    }
+    
+    public String getUsernameFromID(int id) {
+        for(int i=0; i<players.size(); i++) {
+            try {
+                JSONParser parser = new JSONParser();
+                
+                JSONObject data = (JSONObject)parser.parse(players.get(i).toString());
+                if(data.get("player_id").equals(id)) {
+                    return data.get("username").toString();
+                }
+            
+            } catch (ParseException ex) {
+                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        return "not found";
+    }
+    
+    public void vote() {
+        JSONObject data = (JSONObject)this.listenToServer();
+        Scanner keyboard = new Scanner(System.in);
+        do {
+            if(data.get("method") != null) {
+                if(data.get("method").equals("vote_now")) {
+                    // SEND STATUS OK
+                    data.clear();
+                    data.put("status", "ok");
+                    this.sendToServer(data);
+                    data.clear();
+                    
+                    if(this.player.getKPUID() == this.player.getID()) {
+                        // KPU
+                        Thread t1 = new Thread(this);
+                        t1.start();
 
+                        System.out.print("Siapa werewolf nya? ");
+                        String voted_player = keyboard.nextLine();
+
+                        this.votes.add(this.getIDFromUsername(voted_player));
+
+                        try {
+                            t1.join();
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        
+                        System.out.println("ONE KILLED "); this.getUsernameFromID(this.getVoteResult());
+                        
+                    }
+                    else {
+                        System.out.print("Siapa werewolf nya? ");
+                        String voted_player = keyboard.nextLine();
+                        data.put("method","vote_civilian");
+                        data.put("player_id", this.getIDFromUsername(voted_player));
+                        this.sendToUDP(this.player.getUDPAddress(), this.player.getUDPPort(), data.toJSONString());
+                    }
+                }
+                else {
+                    System.out.println("Server does not send to vote");
+                }
+            }
+        } while(data.get("method").equals("vote_now"));
+    }
 }
