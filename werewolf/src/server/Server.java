@@ -31,7 +31,7 @@ import org.json.simple.JSONObject;
  */
 public class Server extends Thread {
     public final static int COMM_PORT = 8181;  // socket port for client comms
-    private final static int PLAYER_TO_PLAY = 3; // minimum number of clients
+    private final static int PLAYER_TO_PLAY = 6; // minimum number of clients
     
     private static ServerSocket serverSocket; // server socket
     private static ArrayList<JSONObject> players = new ArrayList<>(); // list of all players
@@ -203,10 +203,6 @@ public class Server extends Thread {
                         int kpu_id = electedKPU();
                         System.out.println("Elected KPU: " + kpu_id);
                         temp.clear();
-                        temp.put("status", "ok");
-                        temp.put("description", "your KPU proposal has been accepted");
-                        send(clientSocket, temp);
-                        temp.clear();
                         temp.put("method", "kpu_selected");
                         temp.put("kpu_id", kpu_id);
                         send(clientSocket, temp);
@@ -228,6 +224,7 @@ public class Server extends Thread {
                         temp.put("status", "ok");
                         temp.put("description", "vote result for werewolf recieved");
                     }
+                    send(clientSocket, temp);
                 } else if (jsonRecv.get("method").equals("vote_result_civillian")) {
                     if (!isPlaying){
                         temp.put("status", "fail");
@@ -236,6 +233,7 @@ public class Server extends Thread {
                         temp.put("status", "ok");
                         temp.put("description", "vote result for civillian recieved");
                     }
+                    send(clientSocket, temp);
                 } else if (jsonRecv.get("method").equals("vote_result")) {
                     if (!isPlaying){
                         temp.put("status", "fail");
@@ -244,6 +242,7 @@ public class Server extends Thread {
                         temp.put("status", "fail");
                         temp.put("description", "no one is killed");
                     }
+                    send(clientSocket, temp);
                 }
                 isLeave = method.equals("leave");
             }
