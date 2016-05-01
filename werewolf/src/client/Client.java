@@ -43,7 +43,7 @@ public class Client implements Runnable {
     
     private static JSONArray players = new JSONArray(); // lists of players
     private Player player; // client as player
-    private ArrayList<String> friends = new ArrayList<String>(); // player's friends (werewolf only)
+    private ArrayList<String> friends = new ArrayList<>(); // player's friends (werewolf only)
     
     private boolean isDay; // return true when day
     private int day = 0; // number of days
@@ -270,6 +270,10 @@ public class Client implements Runnable {
             
             // Mendapatkan status dari server = ok
             obj = (JSONObject)listenToServer();
+            if(obj.get("status") != null) {
+                if(obj.get("status").equals("ok")) {
+                }
+            }
         } catch (UnknownHostException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         }
