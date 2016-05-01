@@ -157,6 +157,7 @@ public class Client implements Runnable {
             }
             JSONObject method;
             do {
+                System.out.println("it is night baby");
                 client.vote();
                 method = client.changePhase();
             } while(method.get("method").equals("vote_now"));
@@ -491,7 +492,12 @@ public class Client implements Runnable {
                 }
                 else if(jsonRecv.get("method").equals("vote_werewolf")) {
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
-                    if(this.getAliveWerewolves()-2 == i) break;
+                    if(this.player.getRole().equals("werewolf")) {
+                        if(1-this.getDeadWerewolf() == i+1) break;
+                    }
+                    else {
+                        if(2-this.getDeadWerewolf() == i+1) break;
+                    }
                 }
             }
         }
@@ -556,7 +562,7 @@ public class Client implements Runnable {
     }
     
     public void werewolfVoteInfo(JSONArray final_array) {
-        JSONObject recv = (JSONObject)listenToServer();
+        JSONObject recv;
         do { // send method
             JSONObject obj = new JSONObject();
             int player_id = getVoteResult();
@@ -571,6 +577,8 @@ public class Client implements Runnable {
             obj.put("vote_result",final_array); ////ini belom ditangani yg final_arraynya
             
             sendToServer(obj);
+            
+            recv = (JSONObject)listenToServer();
             if(!recv.get("status").equals("ok")) {
                 System.out.println(recv.toJSONString());
             }
@@ -704,24 +712,39 @@ public class Client implements Runnable {
                     System.out.println(final_array.toJSONString());
 
                     if (isDay) {
+                        System.out.println("DAY");
                         civilianVoteInfo(final_array);
                     } else {
+                        System.out.println("NIGHT");
                         werewolfVoteInfo(final_array);
                     }
 
                 }
                 else {
-                    if(this.player.getRole().equals("civilian")) {
-                        System.out.print("Who is the werewolf? ");
+                    if(isDay) {
+                        if(this.player.getRole().equals("civilian")) {
+                            System.out.print("Who is the werewolf? ");
+                        }
+                        else {
+                            System.out.print("Who will you kill? ");
+                        }
+                        String voted_player = keyboard.nextLine();
+                        data.put("method","vote_civilian");
+                        data.put("player_id", this.getIDFromUsername(voted_player));
+                        this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
                     }
                     else {
-                        System.out.print("Who will you kill? ");
+                        if(this.player.getRole().equals("civilian")) {
+                            System.out.print("You cannot vote. You are sleeping...");
+                        }
+                        else {
+                            System.out.print("Who will you kill tonight? ");
+                            String voted_player = keyboard.nextLine();
+                            data.put("method","vote_werewolf");
+                            data.put("player_id", this.getIDFromUsername(voted_player));
+                            this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
+                        }
                     }
-                    
-                    String voted_player = keyboard.nextLine();
-                    data.put("method","vote_civilian");
-                    data.put("player_id", this.getIDFromUsername(voted_player));
-                    this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
                 }
             }
             else {
@@ -743,13 +766,19 @@ public class Client implements Runnable {
         return counter;
     }
     
-    public int getAliveWerewolves() {
+    public int getDeadWerewolf() {
         int counter = 0;
-        
+        System.out.println("ALIVE WEREWOLVES "+players.toJSONString());
         for  (int i=0; i<players.size(); i++) {
-            if (Integer.parseInt(((JSONObject)players.get(i)).get("is_alive").toString())==1) {
-                if (((JSONObject)players.get(i)).get("role").toString().equals("werewolf")) {
-                    counter++;
+            if (Integer.parseInt(((JSONObject)players.get(i)).get("is_alive").toString())==0) {
+                JSONObject player = (JSONObject)players.get(i);
+                if(player != null) {
+                    Object role = player.get("role");
+                    if(role != null) {
+                        if (role.toString().equals("werewolf")) {
+                            counter++;
+                        }
+                    }
                 }
             }
         }

@@ -44,7 +44,7 @@ public class Server extends Thread {
     private static int player_count = 0; // number of players currently alive
     private int day = 0; // number of days
     private int day_vote = 0; // number of voting time
-    private boolean isDay = false;
+    private static boolean isDay = false;
     private boolean isPlaying = false;
     
     private final Socket clientSocket;
