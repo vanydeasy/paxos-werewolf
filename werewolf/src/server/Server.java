@@ -286,7 +286,7 @@ public class Server extends Thread {
                             } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
                                 gameOver("civilian");
                             } else {
-                                changePhase("day", client_socket.get(i));
+                                changePhase("night", client_socket.get(i));
                             }
                         }
                     }
@@ -315,7 +315,7 @@ public class Server extends Thread {
                                     } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
                                         gameOver("civilian");
                                     } else {
-                                        changePhase("day", client_socket.get(i));
+                                        changePhase("night", client_socket.get(i));
                                     }
                                 }
                             } else {
