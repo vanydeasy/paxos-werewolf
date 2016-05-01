@@ -703,13 +703,11 @@ public class Client implements Runnable {
                     JSONArray final_array = new JSONArray();
 
                     for (int j=0; j<votes.size(); j++) {
-                        json_array.add(0, j);
-                        json_array.add(1, votes.get(j));
-                        final_array.add(j, json_array);
-                        json_array.remove(0);
-                        json_array.remove(0);
+                        json_array.add(j); json_array.add(votes.get(j));
+                        
+                        final_array.add(json_array.toJSONString());
+                        json_array.clear();
                     }
-                    System.out.println(final_array.toJSONString());
 
                     if (isDay) {
                         System.out.println("DAY");
