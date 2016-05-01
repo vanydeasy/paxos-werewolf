@@ -79,81 +79,90 @@ public class Client implements Runnable {
         
         //siang
         client.changePhase();
+        client.requestListOfClients();
         
         // GAME PLAY HERE
         while(true) {
-            if(client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-2)).get("player_id")
-                || client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-1)).get("player_id")) {
-                // PROPOSER pid dua terbesar (player ke n dan n­1) 
-                client.player.setProposer(true);
+            System.out.println("YOUR ROLE IS "+client.player.getRole());
+            if(client.isDay) {
+                if(client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-2)).get("player_id")
+                    || client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-1)).get("player_id")) {
+                    // PROPOSER pid dua terbesar (player ke n dan n­1) 
+                    client.player.setProposer(true);
 
-                System.out.println("\nYou can propose");
+                    System.out.println("\nYou can propose");
 
-                // PAXOS PREPARE PROPOSAL
-                JSONObject sent = new JSONObject();
-                sent.put("method", "prepare_proposal");
-                client.player.setProposalID(client.player.getProposalID()+1);
-                sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
-                String sendData = sent.toJSONString();
+                    // PAXOS PREPARE PROPOSAL
+                    JSONObject sent = new JSONObject();
+                    sent.put("method", "prepare_proposal");
+                    client.player.setProposalID(client.player.getProposalID()+1);
+                    sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
+                    String sendData = sent.toJSONString();
 
-                Thread t1 = new Thread(client);
-                t1.start();
-                
-                for(int i=0;i<Client.players.size();i++) {
-                    String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
-                    int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
-                    if ( port != client.player.getUDPPort()){
-                        client.sendToUDP(ipAddress, port, sendData);
-                    }
-                }
-                          
-                try {
-                    t1.join();
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                }
-                
-                Thread t2 = new Thread(client);
-                t2.start();
-                
-                sent.clear();
-                sent.put("method", "accept_proposal");
-                sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
-                sendData = sent.toJSONString();
-                for(int i=0;i<Client.players.size();i++) {
-                    // PAXOS ACCEPT PROPOSAL
-                    String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
-                    int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
-                    if ( port != client.player.getUDPPort()){
-                        client.sendToUDP(ipAddress, port, sendData);
-                    }
-                }
-                
-                try {
-                    t2.join();
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                }
-                
-            }
-            else {
-                try {
-                    // ACCEPTOR
-                    System.out.println("\nYou cannot propose");
                     Thread t1 = new Thread(client);
                     t1.start();
-                    t1.join();
-                    
+
+                    for(int i=0;i<Client.players.size();i++) {
+                        String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
+                        int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
+                        if ( port != client.player.getUDPPort()){
+                            client.sendToUDP(ipAddress, port, sendData);
+                        }
+                    }
+
+                    try {
+                        t1.join();
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
                     Thread t2 = new Thread(client);
                     t2.start();
-                    t2.join();
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+
+                    sent.clear();
+                    sent.put("method", "accept_proposal");
+                    sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
+                    sendData = sent.toJSONString();
+                    for(int i=0;i<Client.players.size();i++) {
+                        // PAXOS ACCEPT PROPOSAL
+                        String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
+                        int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
+                        if ( port != client.player.getUDPPort()){
+                            client.sendToUDP(ipAddress, port, sendData);
+                        }
+                    }
+
+                    try {
+                        t2.join();
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
+                }
+                else {
+                    try {
+                        // ACCEPTOR
+                        System.out.println("\nYou cannot propose");
+                        Thread t1 = new Thread(client);
+                        t1.start();
+                        t1.join();
+
+                        Thread t2 = new Thread(client);
+                        t2.start();
+                        t2.join();
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                    }
                 }
             }
+            JSONObject method;
+            do {
+                client.vote();
+                method = client.changePhase();
+            } while(method.get("method").equals("vote_now"));
             
-            client.vote();
-            client.listenToServer();
+            // Menerima address semua klien dari server
+            client.requestListOfClients();
         }
         
         //client.leaveGame();
@@ -286,7 +295,7 @@ public class Client implements Runnable {
         JSONObject recv = (JSONObject)listenToServer();
         if(recv.get("method").equals("start")) {
             isDay = recv.get("time").equals("day");
-            player.setRole((String) recv.get("role"));
+            player.setRole(recv.get("role").toString());
             if(recv.get("friends")!=null)
                 friends = (ArrayList)recv.get("friends");
 
@@ -299,37 +308,31 @@ public class Client implements Runnable {
         isDay = true;
     }
     
-    public void changePhase() {
+    public JSONObject changePhase() {
         JSONObject recv = (JSONObject)listenToServer();
         if(recv.get("method").equals("change_phase")) {
             day = (int) recv.get("days");
             isDay = recv.get("time").equals("day");
             
-            
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
             sendToServer(obj);
-
-            // Menerima address semua klien dari server
-            requestListOfClients();
         }
-        
+        return recv;
     }
     
     public void requestListOfClients() {
         JSONObject recv;
-        do { // send method
-            JSONObject obj = new JSONObject();
-            obj.put("method","client_address");
-            sendToServer(obj);
-            
-            recv = (JSONObject)listenToServer();
-            players = (JSONArray)recv.get("clients");
+        JSONObject obj = new JSONObject();
+        obj.put("method","client_address");
+        sendToServer(obj);
 
-            if(!recv.get("status").equals("ok")) {
-                System.out.println(recv.toJSONString());
-            }
-        } while(!recv.get("status").equals("ok"));
+        recv = (JSONObject)listenToServer();
+        players = (JSONArray)recv.get("clients");
+
+        if(!recv.get("status").equals("ok")) {
+            System.out.println(recv.toJSONString());
+        }
     }
     
     public void leaveGame() {
@@ -481,8 +484,11 @@ public class Client implements Runnable {
                 }
                 else if(jsonRecv.get("method").equals("vote_civilian")) {
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
-                    // TODO ini harus diubah harusnya cuma diitung player yang masih hidup
-                    if(Client.players.size()-2 == i) break;
+                    if(this.getAlivePlayers()-2 == i) break;
+                }
+                else if(jsonRecv.get("method").equals("vote_werewolf")) {
+                    this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
+                    if(this.getAliveWerewolves()-2 == i) break;
                 }
             }
         }
@@ -636,29 +642,22 @@ public class Client implements Runnable {
         
         JSONObject data = (JSONObject)this.listenToServer();
         Scanner keyboard = new Scanner(System.in);
-        do {
-            if(data.get("method") != null) {
-                if(data.get("method").equals("vote_now")) {
-                    isDay = data.get("phase").equals("day");
-                    
-                    // SEND STATUS OK
-                    data.clear();
-                    data.put("status", "ok");
-                    this.sendToServer(data);
-                    data.clear();
-                    
-                    System.out.println("KPU ID "+this.player.getKPUID());
-                    
-                    if(this.player.getKPUID() == this.player.getID()) {
-                        // KPU
-                        Thread t1 = new Thread(this);
-                        t1.start();
+        
+        if(data.get("method") != null) {
+            if(data.get("method").equals("vote_now")) {
+                
+                System.out.println("Time to vote as "+this.player.getRole());
+                isDay = data.get("phase").equals("day");
 
-                        System.out.print("Siapa werewolf nya? ");
-                        String voted_player = keyboard.nextLine();
+                // SEND STATUS OK
+                data.clear();
+                data.put("status", "ok");
+                this.sendToServer(data);
+                data.clear();
 
-                        this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
+                System.out.println("KPU ID "+this.player.getKPUID());
 
+<<<<<<< HEAD
                         try {
                             t1.join();
                         } catch (InterruptedException ex) {
@@ -677,30 +676,101 @@ public class Client implements Runnable {
                             System.out.println(votes.toArray());
                             final_array.add(json_array);
                             json_array.clear();
+=======
+                if(this.player.getKPUID() == this.player.getID()) {
+                    // KPU
+                    Thread t1 = new Thread(this);
+                    t1.start();
+                    String voted_player;
+                    if(isDay) {
+                        if(this.player.getRole().equals("civilian")) {
+                            System.out.print("Siapa werewolf nya? ");
+>>>>>>> add night shift
                         }
-                        System.out.println(final_array.toJSONString());
-                        
-                        if (isDay) {
-                            System.out.println("DAY");
-                            civilianVoteInfo(final_array);
-                        } else {
-                            System.out.println("NIGHT");
-                            werewolfVoteInfo(final_array);
+                        else {
+                            System.out.print("Siapa yang ingin kamu bunuh?");
                         }
-                        
+                        voted_player = keyboard.nextLine();
+                        this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
                     }
                     else {
-                        System.out.print("Siapa werewolf nya? ");
-                        String voted_player = keyboard.nextLine();
-                        data.put("method","vote_civilian");
-                        data.put("player_id", this.getIDFromUsername(voted_player));
-                        this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
+                        if(this.player.getRole().equals("civilian")) {
+                            System.out.println("You are sleeping...");
+                        }
+                        else {
+                            System.out.print("Civilian mana yang ingin kamu bunuh? ");
+                            voted_player = keyboard.nextLine();
+                            this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
+                        }
                     }
+                    
+                    try {
+                        t1.join();
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
+                    System.out.println(votes.toString());
+                    
+                    JSONArray json_array = new JSONArray();
+                    JSONArray final_array = new JSONArray();
+
+                    for (int j=0; j<votes.size(); j++) {
+                        json_array.add(0, j);
+                        json_array.add(1, votes.get(j));
+                        final_array.add(j, json_array);
+                        json_array.remove(0);
+                        json_array.remove(0);
+                    }
+                    System.out.println(final_array.toJSONString());
+
+                    if (isDay) {
+                        System.out.println("DAY");
+                        civilianVoteInfo(final_array);
+                    } else {
+                        System.out.println("NIGHT");
+                        werewolfVoteInfo(final_array);
+                    }
+
                 }
                 else {
-                    System.out.println("Server does not send to vote");
+                    System.out.print("Siapa werewolf nya? ");
+                    String voted_player = keyboard.nextLine();
+                    data.put("method","vote_civilian");
+                    data.put("player_id", this.getIDFromUsername(voted_player));
+                    this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
                 }
             }
-        } while(data.get("method").equals("vote_now"));
+            else {
+                System.out.println("Server does not send to vote");
+            }
+        }
+    }
+    
+    
+    public int getAlivePlayers() {
+        int counter = 0;
+        
+        for  (int i=0; i<players.size(); i++) {
+            if (Integer.parseInt(((JSONObject)players.get(i)).get("is_alive").toString())==1) {
+                counter++;
+            }
+        }
+        
+        return counter;
+    }
+    
+    public int getAliveWerewolves() {
+        int counter = 0;
+        
+        for  (int i=0; i<players.size(); i++) {
+            if (Integer.parseInt(((JSONObject)players.get(i)).get("is_alive").toString())==1) {
+                if (((JSONObject)players.get(i)).get("role").toString().equals("werewolf")) {
+                    counter++;
+                }
+            }
+        }
+        
+        return counter;
     }
 }
