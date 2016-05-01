@@ -154,7 +154,7 @@ public class Server extends Thread {
                         jsonRecv = (JSONObject)recv_status_start;
                         if(jsonRecv.get("status").equals("ok")) { // successfully start the game
                             // CHANGE PHASE
-                            changePhase(clientSocket);
+                            changePhase("day", clientSocket);
                             JSONObject status = (JSONObject)listen(clientSocket);
                             if(status.get("status").equals("ok")) { 
                                 // success
@@ -254,7 +254,7 @@ public class Server extends Thread {
                         killPlayer(killed);
                         
                         for (int i = 0; i < players.size(); i++){
-                            changePhase(client_socket.get(i));
+                            changePhase("day", client_socket.get(i));
                         }
                     }
                 } else if (jsonRecv.get("method").equals("vote_result_civilian")) {
@@ -275,7 +275,7 @@ public class Server extends Thread {
                         killPlayer(killed);
                         
                         for (int i = 0; i < players.size(); i++){
-                            changePhase(client_socket.get(i));
+                            changePhase("night", client_socket.get(i));
                         }
                     }
                 } else if (jsonRecv.get("method").equals("vote_result")) {
@@ -298,7 +298,7 @@ public class Server extends Thread {
                                 if (day_vote < 2){ // voting done less than 2 times
                                     voteNow("day", client_socket.get(i));
                                 } else {
-                                    changePhase(client_socket.get(i));
+                                    changePhase("night", client_socket.get(i));
                                 }
                             } else {
                                 voteNow("night", client_socket.get(i));
@@ -456,17 +456,17 @@ public class Server extends Thread {
         }
     }
     
-    public void changePhase(Socket socket){
-        isDay = !isDay;
-        
+    public void changePhase(String d, Socket socket){
         JSONObject temp = new JSONObject();
         temp.put("method", "change_phase");
-        if (isDay){
+        temp.put("time", d);
+        
+        if (d.equals("day")){
+            isDay = true;
             day_vote = 0;
-            temp.put("time", "day");
             temp.put("days", ++day);
         } else {
-            temp.put("time", "night");
+            isDay = false;
             temp.put("days", day);
         }
         temp.put("description", "");
@@ -474,10 +474,10 @@ public class Server extends Thread {
         send(socket, temp);
     }
     
-    public void voteNow(String day, Socket socket){
+    public void voteNow(String d, Socket socket){
         JSONObject temp = new JSONObject();
         temp.put("method", "vote_now");
-        temp.put("phase", day);
+        temp.put("phase", d);
         send(socket, temp);
     }
     
