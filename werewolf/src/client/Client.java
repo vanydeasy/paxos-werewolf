@@ -156,17 +156,24 @@ public class Client implements Runnable {
                 }
             }
             JSONObject method;
-            do {
-                System.out.println("it is night baby");
-                client.vote();
-                method = client.changePhase();
-            } while(method.get("method").equals("vote_now"));
+            JSONObject data = (JSONObject)client.listenToServer();
+            if(data.get("method") != null) {
+                if(data.get("method").equals("vote_now")) {
+                    client.isDay = data.get("phase").equals("day");
+                    do {
+                        client.vote();
+                        method = client.changePhase();
+                    } while(method.get("method").equals("vote_now"));
+
+                    if(method.get("method").equals("game_over")) break;
+                }
+            }
             
             // Menerima address semua klien dari server
             client.requestListOfClients();
         }
         
-        //client.leaveGame();
+        client.leaveGame();
     }
     
     public void connectToServer() { // Connect client to server (binding)
@@ -198,7 +205,7 @@ public class Client implements Runnable {
     }
     
     public String listenToUDP() {
-        System.out.println("Listen on port "+player.getUDPPort());
+        // System.out.println("Listen on port "+player.getUDPPort());
         try {
             byte[] receiveData = new byte[1024];
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
@@ -324,6 +331,13 @@ public class Client implements Runnable {
             obj.put("status","ok");
             sendToServer(obj);
         }
+        else if(recv.get("method").equals("game_over")) {
+            System.out.println("THE GAME IS OVER");
+            
+            JSONObject obj = new JSONObject();
+            obj.put("status","ok");
+            sendToServer(obj);
+        }
         return recv;
     }
     
@@ -335,6 +349,13 @@ public class Client implements Runnable {
 
         recv = (JSONObject)listenToServer();
         players = (JSONArray)recv.get("clients");
+        
+        for(int i = 0; i < players.size(); i++) {
+            JSONObject player = (JSONObject)players.get(i);
+            if(Integer.parseInt(player.get("player_id").toString()) == this.player.getID()) {
+                this.player.setState(Integer.parseInt(player.get("is_alive").toString()) == 1);
+            }
+        }
 
         if(!recv.get("status").equals("ok")) {
             System.out.println(recv.toJSONString());
@@ -361,7 +382,7 @@ public class Client implements Runnable {
         String str_prop_1 = "{}"; 
         int size;
         
-        if(this.player.isProposer()) size = players.size();
+        if(this.player.isProposer()) size = this.getAlivePlayers();
         else size = 2;
         
         for(int i = 0; i < size; i++) {
@@ -379,7 +400,6 @@ public class Client implements Runnable {
             JSONObject data = new JSONObject();
             if(jsonRecv.get("method") != null) {
                 if(jsonRecv.get("method").equals("prepare_proposal")){
-                    data.put("from", this.player.getUDPPort());
                     data.put("status", "ok");
                     data.put("description", "accepted");
                     data.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
@@ -424,7 +444,6 @@ public class Client implements Runnable {
                                     player_won = player_id_1;
                                     player_lose = player_id_2;
                                 }
-                                
                             }
                             
                             data.put("status", "ok");
@@ -600,8 +619,6 @@ public class Client implements Runnable {
             }
             obj.put("vote_result",final_array); //ini belom ditangani yg final_arraynya
             
-            System.out.println(obj.toJSONString());
-            
             sendToServer(obj);
             
             recv = (JSONObject)listenToServer();
@@ -651,104 +668,95 @@ public class Client implements Runnable {
             votes.add(0);
         }
         
-        JSONObject data = (JSONObject)this.listenToServer();
         Scanner keyboard = new Scanner(System.in);
-        
-        if(data.get("method") != null) {
-            if(data.get("method").equals("vote_now")) {
-                
-                isDay = data.get("phase").equals("day");
+        JSONObject data = new JSONObject();
+        // SEND STATUS OK
+        data.put("status", "ok");
+        this.sendToServer(data);
+        data.clear();
 
-                // SEND STATUS OK
-                data.clear();
-                data.put("status", "ok");
-                this.sendToServer(data);
-                data.clear();
-
-                if(this.player.getKPUID() == this.player.getID()) {
-                    System.out.println("I AM THE KPU FOR TODAY");
-                    Thread t1 = new Thread(this);
-                    t1.start();
-                    String voted_player;
-                    if(isDay) {
-                        if(this.player.getRole().equals("civilian")) {
-                            System.out.print("Who is the werewolf? ");
-                        }
-                        else {
-                            System.out.print("Who will you kill? ");
-                        }
-                        voted_player = keyboard.nextLine();
-                        this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
-                    }
-                    else {
-                        if(this.player.getRole().equals("civilian")) {
-                            System.out.println("You cannot vote. You are sleeping...");
-                        }
-                        else {
-                            System.out.print("Which civilian you are going to kill? ");
-                            voted_player = keyboard.nextLine();
-                            this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
-                        }
-                    }
-                    
-                    try {
-                        t1.join();
-                    } catch (InterruptedException ex) {
-                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-
-                    System.out.println(votes.toString());
-                    
-                    JSONArray json_array = new JSONArray();
-                    JSONArray final_array = new JSONArray();
-
-                    for (int j=0; j<votes.size(); j++) {
-                        json_array.add(j); json_array.add(votes.get(j));
-                        
-                        final_array.add(json_array.toJSONString());
-                        json_array.clear();
-                    }
-
-                    if (isDay) {
-                        System.out.println("DAY");
-                        civilianVoteInfo(final_array);
-                    } else {
-                        System.out.println("NIGHT");
-                        werewolfVoteInfo(final_array);
-                    }
-
+        if(this.player.getKPUID() == this.player.getID()) {
+            System.out.println("I AM THE KPU FOR TODAY");
+            Thread t1 = new Thread(this);
+            t1.start();
+            String voted_player;
+            if(isDay && this.player.isAlive()) {
+                if(this.player.getRole().equals("civilian")) {
+                    System.out.print("Who is the werewolf? ");
                 }
                 else {
-                    if(isDay) {
-                        if(this.player.getRole().equals("civilian")) {
-                            System.out.print("Who is the werewolf? ");
-                        }
-                        else {
-                            System.out.print("Who will you kill? ");
-                        }
-                        String voted_player = keyboard.nextLine();
-                        data.put("method","vote_civilian");
-                        data.put("player_id", this.getIDFromUsername(voted_player));
-                        this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
-                    }
-                    else {
-                        if(this.player.getRole().equals("civilian")) {
-                            System.out.print("You cannot vote. You are sleeping...");
-                        }
-                        else {
-                            System.out.print("Who will you kill tonight? ");
-                            String voted_player = keyboard.nextLine();
-                            data.put("method","vote_werewolf");
-                            data.put("player_id", this.getIDFromUsername(voted_player));
-                            this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
-                        }
-                    }
+                    System.out.print("Who will you kill? ");
+                }
+                voted_player = keyboard.nextLine();
+                this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
+            }
+            else if(!isDay && this.player.isAlive()) {
+                if(this.player.getRole().equals("civilian")) {
+                    System.out.println("You cannot vote. You are sleeping...");
+                }
+                else {
+                    System.out.print("Which civilian you are going to kill? ");
+                    voted_player = keyboard.nextLine();
+                    this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
                 }
             }
-            else {
-                System.out.println("Server does not send to vote");
+            else if(!this.player.isAlive()) {
+                System.out.println("You already died. Just watch!");
+            }
+
+            try {
+                t1.join();
+            } catch (InterruptedException ex) {
+                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+            JSONArray json_array = new JSONArray();
+            JSONArray final_array = new JSONArray();
+
+            for (int j=0; j<votes.size(); j++) {
+                json_array.add(j); json_array.add(votes.get(j));
+
+                final_array.add(json_array.toJSONString());
+                json_array.clear();
+            }
+
+            if (isDay) {
+                civilianVoteInfo(final_array);
+            } else {
+                werewolfVoteInfo(final_array);
+            }
+
+        }
+        else {
+            if(isDay && this.player.isAlive()) {
+                if(this.player.getRole().equals("civilian")) {
+                    System.out.print("Who is the werewolf? ");
+                }
+                else {
+                    System.out.print("Who will you kill? ");
+                }
+                String voted_player = keyboard.nextLine();
+                data.put("method","vote_civilian");
+                data.put("player_id", this.getIDFromUsername(voted_player));
+                this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
+            }
+            else if(!isDay && this.player.isAlive()) {
+                if(this.player.getRole().equals("civilian")) {
+                    System.out.print("You cannot vote. You are sleeping...");
+                }
+                else {
+                    System.out.print("Who will you kill tonight? ");
+                    String voted_player = keyboard.nextLine();
+                    data.put("method","vote_werewolf");
+                    data.put("player_id", this.getIDFromUsername(voted_player));
+                    this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
+                }
+            }
+            else if(!this.player.isAlive()) {
+                System.out.println("You already died. Just watch!");
             }
         }
+            
     }
     
     
