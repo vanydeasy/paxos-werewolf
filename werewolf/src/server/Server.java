@@ -336,6 +336,32 @@ public class Server extends Thread {
         } while(!recv.get("status").equals("ok"));
     }
     
+    public int getDeadPlayers() {
+        int counter = 0;
+        
+        for  (int i=0; i<players.size(); i++) {
+            if (Integer.parseInt(players.get(i).get("is_alive").toString())==0) {
+                counter++;
+            }
+        }
+        
+        return counter;
+    }
+    
+    public int getDeadWerewolfNumber() {
+        int counter = 0;
+        
+        for  (int i=0; i<players.size(); i++) {
+            if (Integer.parseInt(players.get(i).get("is_alive").toString())==0) {
+                if (players.get(i).get("role").toString().equals("werewolf")) {
+                    counter++;
+                }
+            }
+        }
+        
+        return counter;
+    }
+    
     public int electedKPU(){
         int smallest_id = 0, candidate1_id = 0, candidate2_id = 0;
         int candidate1_count = 0, candidate2_count = 0;
