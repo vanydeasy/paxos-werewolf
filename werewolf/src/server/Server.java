@@ -446,7 +446,7 @@ public class Server extends Thread {
         int smallest_id = 0, candidate1_id = 0, candidate2_id = 0;
         int candidate1_count = 0, candidate2_count = 0;
         for (int i=0; i<players.size(); i++){
-            if ((Integer)players.get(i).get("is_alive") == 1){
+            if (Integer.parseInt(players.get(i).get("is_alive").toString()) == 1){
                 candidate1_id = proposed_kpu_id.get(i);
                 candidate1_count++;
                 smallest_id = i;
@@ -455,7 +455,7 @@ public class Server extends Thread {
         }
         
         for (int i = smallest_id+1; i<players.size(); i++){
-            if ((Integer)players.get(i).get("is_alive") == 1){
+            if (Integer.parseInt(players.get(i).get("is_alive").toString()) == 1){
                 if (proposed_kpu_id.get(i) == candidate1_id){
                     candidate1_count++;
                 } else {
