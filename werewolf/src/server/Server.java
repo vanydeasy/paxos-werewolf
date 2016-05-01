@@ -178,7 +178,7 @@ public class Server extends Thread {
                     }
                     send(clientSocket, temp);
                 }
-                else if (jsonRecv.get("method").equals("prepare_proposal")){
+                else if (jsonRecv.get("method").equals("accepted_proposal")){
                     if (!isPlaying){
                         temp.put("status", "fail");
                         temp.put("description", "the game hasn't started yet");
@@ -201,7 +201,7 @@ public class Server extends Thread {
                     // INCLUDING the proposers themselves
                     if (proposed_kpu_id.size() == playerCount){ 
                         int kpu_id = electedKPU();
-                        /* TODO: KALO HASIL PEMILU SERI (kpu_id = -1) BELOM DITANGANI */
+                        System.out.println("Elected KPU: " + kpu_id);
                         temp.clear();
                         temp.put("status", "ok");
                         temp.put("description", "your KPU proposal has been accepted");
@@ -387,10 +387,8 @@ public class Server extends Thread {
         
         if (candidate2_count > candidate1_count){
             return candidate2_id;
-        } else if (candidate2_count < candidate1_count){
+        } else { // jika jumlah vote sama, otomatis kandidat pertama terpilih
             return candidate1_id;
-        } else { // DRAW
-            return -1;
         }
     }
     
