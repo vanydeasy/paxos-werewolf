@@ -546,63 +546,49 @@ public class Client implements Runnable {
         return killed_player;            
     }
     
-    public void werewolfKilled() {
-        //ini uda pake udp-an
-    }
-    
-    public void playerKilledInfo(int vote_status, int player_killed) {
+    public void werewolfVoteInfo(JSONArray final_array) {
         JSONObject recv = (JSONObject)listenToServer();
-        if (this.player.getID() == this.player.getKPUID()) {
-            do { // send method
-                JSONObject obj = new JSONObject();
-                obj.put("method","vote_result_werewolf");
-                obj.put("vote_status",vote_status);
-                if (vote_status == 1) {
-                        obj.put("player_killed", player_killed); //Gatau ini buat apaa	
-                }
-
-                for (int i=0; i<player_killed; i++) {
-
-                }
-
-            //    obj.put("player_killed", ); Gatau ini buat apaa
-
-                sendToServer(obj);
-                if(!recv.get("status").equals("ok")) {
-                    System.out.println(recv.toJSONString());
-                }
-            } while(!recv.get("status").equals("ok"));
-        }
-    }
-
-    public void civilianKilled() {
-        //pake udp
-    }
-
-    public void civilianKilledInfo(int vote_status, int player_killed) {
-        JSONObject recv = (JSONObject)listenToServer();
-        if (this.player.getID() == this.player.getKPUID()) {
-            do { // send method
-                JSONObject obj = new JSONObject();
-                obj.put("method","vote_result_civilian");
-                obj.put("vote_status",vote_status);
-                if (vote_status == 1) {
-                        obj.put("player_killed", player_killed); //Gatau ini buat apaa	
-                }
-
-                for (int i=0; i<player_killed; i++) {
-
-                }
-
-            //    obj.put("player_killed", ); Gatau ini buat apaa
-
-                sendToServer(obj);
-                if(!recv.get("status").equals("ok")) {
-                    System.out.println(recv.toJSONString());
-                }
-            } while(!recv.get("status").equals("ok"));
-        }
+        do { // send method
+            JSONObject obj = new JSONObject();
+            int player_id = getVoteResult();
+            if (player_id != -1) {
+                obj.put("method", "vote_result_werewolf");
+                obj.put("vote_status",1);
+                obj.put("player_killed",player_id);
+            } else {
+                obj.put("method", "vote_result");
+                obj.put("vote_status",-1);
+            }
+            obj.put("vote_result",final_array); ////ini belom ditangani yg final_arraynya
+            
+            sendToServer(obj);
+            if(!recv.get("status").equals("ok")) {
+                System.out.println(recv.toJSONString());
+            }
+        } while(!recv.get("status").equals("ok"));
     }   
+    
+    public void civilianVoteInfo(JSONArray final_array) {
+        JSONObject recv = (JSONObject)listenToServer();
+        do { // send method
+            JSONObject obj = new JSONObject();
+            int player_id = getVoteResult();
+            if (player_id != -1) {
+                obj.put("method", "vote_result_civilian");
+                obj.put("vote_status",1);
+                obj.put("player_killed",player_id);
+            } else {
+                obj.put("method", "vote_result");
+                obj.put("vote_status",-1);
+            }
+            obj.put("vote_result",final_array); //ini belom ditangani yg final_arraynya
+             
+            sendToServer(obj);
+            if(!recv.get("status").equals("ok")) {
+                System.out.println(recv.toJSONString());
+            }
+        } while(!recv.get("status").equals("ok"));
+    }
     
     public int getIDFromUsername(String username) {
         for(int i=0; i<players.size(); i++) {
