@@ -39,6 +39,8 @@ public class Client implements Runnable {
     public String SERVER_HOSTNAME;
     public int COMM_PORT;  // socket port for client comms
     
+    private DatagramSocket udpSocket;
+    
     private static JSONArray players = new JSONArray(); // lists of players
     private Player player; // client as player
     private ArrayList<String> friends = new ArrayList<String>(); // player's friends (werewolf only)
@@ -80,8 +82,8 @@ public class Client implements Runnable {
         
         // GAME PLAY HERE
         while(true) {
-            if(client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-2)).get("player_id")
-                || client.player.getID() == (Integer)((JSONObject)client.players.get(client.players.size()-1)).get("player_id")) {
+            if(client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-2)).get("player_id")
+                || client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-1)).get("player_id")) {
                 // PROPOSER pid dua terbesar (player ke n dan n­1) 
                 client.player.setProposer(true);
 
@@ -103,9 +105,9 @@ public class Client implements Runnable {
                     Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                 }
                 
-                for(int i=0;i<client.players.size();i++) {
-                    String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
-                    int port = (Integer)((JSONObject)client.players.get(i)).get("port");
+                for(int i=0;i<Client.players.size();i++) {
+                    String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
+                    int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
                     if ( port != client.player.getUDPPort()){
                         client.sendToUDP(ipAddress, port, sendData);
                     }
@@ -130,10 +132,10 @@ public class Client implements Runnable {
                 sent.put("method", "accept_proposal");
                 sent.put("proposal_id", "("+client.player.getProposalID()+","+client.player.getID()+")"); // (local clock, local identifier)
                 sendData = sent.toJSONString();
-                for(int i=0;i<client.players.size();i++) {
+                for(int i=0;i<Client.players.size();i++) {
                     // PAXOS ACCEPT PROPOSAL
-                    String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
-                    int port = (Integer)((JSONObject)client.players.get(i)).get("port");
+                    String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
+                    int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
                     if ( port != client.player.getUDPPort()){
                         client.sendToUDP(ipAddress, port, sendData);
                     }
@@ -199,12 +201,10 @@ public class Client implements Runnable {
         System.out.println("Listen on port "+player.getUDPPort());
         try {
             byte[] receiveData = new byte[1024];
-            DatagramSocket serverSocket = new DatagramSocket(player.getUDPPort());
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-            serverSocket.receive(receivePacket);
+            udpSocket.receive(receivePacket);
             String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
             System.out.println("Received from UDP: "+sentence);
-            serverSocket.close();
             return sentence;
         } catch (IOException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
@@ -215,9 +215,8 @@ public class Client implements Runnable {
     // Send object to server
     public void sendToServer(Object object) {
         System.out.println("Send to server: "+object.toString());
-        OutputStream oStream = null;
         try {
-            oStream = socket.getOutputStream();
+            OutputStream oStream = socket.getOutputStream();
             ObjectOutputStream ooStream = new ObjectOutputStream(oStream);
             ooStream.writeObject(object);  // send seriliazed
         } catch (IOException ex) {
@@ -229,11 +228,9 @@ public class Client implements Runnable {
         System.out.println("Send to "+ipAddress+"|"+port+": "+send);
         byte[] sendData = send.getBytes();
         try {
-            DatagramSocket datagramSocket = new DatagramSocket();
-            UnreliableSender unreliableSender = new UnreliableSender(datagramSocket);
+            UnreliableSender unreliableSender = new UnreliableSender(udpSocket);
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress), port);
             unreliableSender.send(sendPacket, 1.00);
-            datagramSocket.close();
         } catch (SocketException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -259,6 +256,12 @@ public class Client implements Runnable {
                     obj.put("udp_port",udp_port);
                     obj.put("method","join");
                     sendToServer(obj);
+                    
+                    try {
+                        udpSocket = new DatagramSocket(udp_port);
+                    } catch (SocketException ex) {
+                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                    }
                     
                     obj = (JSONObject)listenToServer();
                     if(obj.get("status")==null) break;
@@ -306,11 +309,8 @@ public class Client implements Runnable {
         JSONObject recv = (JSONObject)listenToServer();
         if(recv.get("method").equals("change_phase")) {
             day = (int) recv.get("days");
-            if (recv.get("time").equals("day")) {
-                isDay = true;
-            } else {
-                isDay = false;
-            }
+            isDay = recv.get("time").equals("day");
+            
             
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
@@ -469,7 +469,7 @@ public class Client implements Runnable {
     
     public String getPlayerAddress(int id) {
         for(int i = 0; i < players.size(); i++) {
-            JSONObject temp = (JSONObject)this.players.get(i);
+            JSONObject temp = (JSONObject)Client.players.get(i);
             if(Integer.parseInt(temp.get("player_id").toString()) == id) {
                 return (String)temp.get("address");
             }
@@ -478,8 +478,8 @@ public class Client implements Runnable {
     }
     
     public int getPlayerPort(int id) {
-        for(int i = 0; i < players.size(); i++) {
-            JSONObject temp = (JSONObject)this.players.get(i);
+        for(int i = 0; i < Client.players.size(); i++) {
+            JSONObject temp = (JSONObject)Client.players.get(i);
             if(Integer.parseInt(temp.get("player_id").toString()) == id) {
                 return (Integer)temp.get("port");
             }

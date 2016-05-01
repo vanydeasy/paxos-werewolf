@@ -43,8 +43,6 @@ public class UnreliableSender
             datagramSocket.send(packet);
             System.out.println("Sending the package");
         }
-
-        datagramSocket.close();
     }
 
     public void send(String filename) throws IOException {
