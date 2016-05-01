@@ -304,11 +304,13 @@ public class Server extends Thread {
                         temp.put("description", "no one is killed");
                         send(clientSocket, temp);
                         
+                        if (isDay) day_vote++;
+                        
                         for (int i = 0; i < players.size(); i++){
                             if (isDay){
-                                day_vote++;
                                 if (day_vote < 2){ // voting done less than 2 times
                                     voteNow("day", client_socket.get(i));
+                                    System.out.println("kurang dari 2x");
                                 } else {
                                     if (getAliveWerewolfNumber() == 0){
                                         gameOver("werewolf");
