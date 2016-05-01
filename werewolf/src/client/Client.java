@@ -310,9 +310,6 @@ public class Client implements Runnable {
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
             sendToServer(obj);
-            obj.clear();
-            obj.put("method","client_address");
-            sendToServer(obj);
 
             // Menerima address semua klien dari server
             requestListOfClients();
@@ -445,9 +442,12 @@ public class Client implements Runnable {
                             JSONObject status = (JSONObject)this.listenToServer();
                             if(status.get("status").equals("ok")) {
                                 JSONObject kpu = (JSONObject)this.listenToServer();
-                                if(kpu.get("kpu_selected") != null) {
-                                    this.player.setKPU(Integer.parseInt(kpu.get("kpu_selected").toString()));
+                                if(kpu.get("kpu_id") != null) {
+                                    this.player.setKPU(Integer.parseInt(kpu.get("kpu_id").toString()));
                                 }
+                                data.clear();
+                                data.put("status","ok");
+                                this.sendToServer(data);
                             }
                         }
                         else if(num_proposal == 1 && !this.player.isProposer()) {
@@ -470,8 +470,8 @@ public class Client implements Runnable {
                             JSONObject status = (JSONObject)this.listenToServer();
                             if(status.get("status").equals("ok")) {
                                 JSONObject kpu = (JSONObject)this.listenToServer();
-                                if(kpu.get("kpu_selected") != null) {
-                                    this.player.setKPU(Integer.parseInt(kpu.get("kpu_selected").toString()));
+                                if(kpu.get("kpu_id") != null) {
+                                    this.player.setKPU(Integer.parseInt(kpu.get("kpu_id").toString()));
                                 }
                                 data.clear();
                                 data.put("status","ok");
@@ -492,7 +492,7 @@ public class Client implements Runnable {
         for(int i = 0; i < players.size(); i++) {
             JSONObject temp = (JSONObject)Client.players.get(i);
             if(Integer.parseInt(temp.get("player_id").toString()) == id) {
-                return (String)temp.get("address");
+                return temp.get("address").toString();
             }
         }
         return null;
@@ -502,7 +502,7 @@ public class Client implements Runnable {
         for(int i = 0; i < Client.players.size(); i++) {
             JSONObject temp = (JSONObject)Client.players.get(i);
             if(Integer.parseInt(temp.get("player_id").toString()) == id) {
-                return (Integer)temp.get("port");
+                return Integer.parseInt(temp.get("port").toString());
             }
         }
         return -1;
@@ -635,11 +635,15 @@ public class Client implements Runnable {
         do {
             if(data.get("method") != null) {
                 if(data.get("method").equals("vote_now")) {
+                    isDay = data.get("phase").equals("day");
+                    
                     // SEND STATUS OK
                     data.clear();
                     data.put("status", "ok");
                     this.sendToServer(data);
                     data.clear();
+                    
+                    System.out.println("KPU ID "+this.player.getKPUID());
                     
                     if(this.player.getKPUID() == this.player.getID()) {
                         // KPU
@@ -681,7 +685,7 @@ public class Client implements Runnable {
                         String voted_player = keyboard.nextLine();
                         data.put("method","vote_civilian");
                         data.put("player_id", this.getIDFromUsername(voted_player));
-                        this.sendToUDP(this.player.getUDPAddress(), this.player.getUDPPort(), data.toJSONString());
+                        this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
                     }
                 }
                 else {
