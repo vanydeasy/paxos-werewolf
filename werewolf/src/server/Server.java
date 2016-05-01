@@ -37,6 +37,7 @@ public class Server extends Thread {
     private static ArrayList<JSONObject> players = new ArrayList<>(); // list of all players
     private static ArrayList<String> roles = new ArrayList<>(); // list of roles where index equals player_id
     private static Map<Integer, Integer> proposed_kpu_id = new HashMap<>();
+    private static Map<Integer, Boolean> vote_response = new HashMap<> ();
 
     private static int clientCount = 0; // number of clients
     private static int readyCount = 0; // number of ready clients
@@ -80,7 +81,77 @@ public class Server extends Thread {
         System.out.println ("New Communication Thread Started");
         JSONObject jsonRecv;
         boolean isLeave = false;
+        
+        // Initialize vote_responded
+        vote_response.clear();
+        ArrayList<Integer> pl = getAlivePlayers();
+        for (int i=0; i<pl.size(); i++){
+            vote_response.put(pl.get(i), true);
+        }
+        
+        // Listening
         do {
+            if (!isVoteResponded(player_id)){
+                if (vote_response.containsKey(-1)){ // someone was killed
+                    if (vote_response.get(-1)){ // vote_result_werewolf
+                        changePhase();
+                        
+                        Object recv_status_phase = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_phase;
+                        if(jsonRecv.get("status").equals("ok")) { 
+                            setVoteResponded(player_id);
+                        } else {
+                            // TODO: change phase into day unsuccessful
+                        }
+                    } else { // vote_result_civilian
+                        changePhase();
+                        
+                        Object recv_status_phase = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_phase;
+                        if(jsonRecv.get("status").equals("ok")) { // success
+                            setVoteResponded(player_id);
+                        } else {
+                            // TODO: change phase into night unsuccessful
+                        }
+                    }
+                } else { // vote_result
+                    if (isDay){
+                        day_vote++;
+                        if (day_vote < 2){ // voting done less than 2 times
+                            voteNow("day");
+                            
+                            Object recv_status_vote = listen(clientSocket);
+                            jsonRecv = (JSONObject)recv_status_vote;
+                            if(jsonRecv.get("status").equals("ok")) { 
+                                setVoteResponded(player_id);
+                            } else {
+                                // TODO : vote now unsuccesful
+                            }
+                        } else {
+                            changePhase();
+
+                            Object recv_status_phase = listen(clientSocket);
+                            jsonRecv = (JSONObject)recv_status_phase;
+                            if(jsonRecv.get("status").equals("ok")) { 
+                                setVoteResponded(player_id);
+                            } else {
+                                // TODO: change phase into night unsuccessful
+                            }
+                        }
+                    } else {
+                        voteNow("night");
+                        
+                        Object recv_status_vote = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_vote;
+                        if(jsonRecv.get("status").equals("ok")) { 
+                            setVoteResponded(player_id);
+                        } else {
+                            // TODO : vote now unsuccesful
+                        }
+                    }
+                }
+            }
+            
             JSONObject temp = new JSONObject();
                         
             Object recv = listen(clientSocket);
@@ -172,6 +243,18 @@ public class Server extends Thread {
                         temp.put("description", "the game hasn't started yet");
                     }
                     send(clientSocket, temp);
+                    
+                    if (!isDay){
+                        voteNow("night");
+                        
+                        Object recv_status_phase = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_phase;
+                        if(jsonRecv.get("status").equals("ok")) { 
+                            // success
+                        } else {
+                            // TODO: vote now unsuccessful
+                        }
+                    }
                 }
                 else if (jsonRecv.get("method").equals("accepted_proposal")){
                     if (!isPlaying){
@@ -236,18 +319,9 @@ public class Server extends Thread {
                         int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
                         killPlayer(killed);
                         
-                        // CHANGE PHASE
-                        changePhase();
-                        
-                        Object recv_status_phase = listen(clientSocket);
-                        jsonRecv = (JSONObject)recv_status_phase;
-                        if(jsonRecv.get("status").equals("ok")) { 
-                            // success
-                        } else {
-                            // TODO: change phase into day unsuccessful
-                        }
+                        initVoteResponse("werewolf");
                     }
-                } else if (jsonRecv.get("method").equals("vote_result_civillian")) {
+                } else if (jsonRecv.get("method").equals("vote_result_civilian")) {
                     if (!isPlaying){
                         temp.put("status", "fail");
                         temp.put("description", "the game hasn't started yet");
@@ -258,30 +332,13 @@ public class Server extends Thread {
                         send(clientSocket, temp);
                     } else {
                         temp.put("status", "ok");
-                        temp.put("description", "vote result for civillian recieved");
+                        temp.put("description", "vote result for civilian recieved");
                         send(clientSocket, temp);
                         
                         int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
                         killPlayer(killed);
                         
-                        // CHANGE PHASE
-                        changePhase();
-                        
-                        Object recv_status_phase = listen(clientSocket);
-                        jsonRecv = (JSONObject)recv_status_phase;
-                        if(jsonRecv.get("status").equals("ok")) { // success
-                            voteNow("night");
-                            
-                            Object recv_status_vote = listen(clientSocket);
-                            jsonRecv = (JSONObject)recv_status_vote;
-                            if(jsonRecv.get("status").equals("ok")) { 
-                                // success
-                            } else {
-                                // TODO : vote now unsuccesful
-                            }
-                        } else {
-                            // TODO: change phase into night unsuccessful
-                        }
+                        initVoteResponse("civilian");
                     }
                 } else if (jsonRecv.get("method").equals("vote_result")) {
                     if (!isPlaying){
@@ -297,43 +354,7 @@ public class Server extends Thread {
                         temp.put("description", "no one is killed");
                         send(clientSocket, temp);
                         
-                        temp.clear();
-                        if (isDay){
-                            day_vote++;
-                            if (day_vote < 2){ // voting done less than 2 times
-                                voteNow("day");
-                            } else {
-                                // CHANGE PHASE
-                                changePhase();
-                                
-                                Object recv_status_phase = listen(clientSocket);
-                                jsonRecv = (JSONObject)recv_status_phase;
-                                if(jsonRecv.get("status").equals("ok")) { // success
-                                    voteNow("night");
-
-                                    Object recv_status_vote = listen(clientSocket);
-                                    jsonRecv = (JSONObject)recv_status_vote;
-                                    if(jsonRecv.get("status").equals("ok")) { 
-                                        // success
-                                    } else {
-                                        // TODO : vote now unsuccesful
-                                    }
-                                } else {
-                                    // TODO: change phase into night unsuccessful
-                                }
-                            }
-                        } else {
-                            voteNow("night");
-                        }
-                        send(clientSocket, temp);
-                        
-                        Object recv_status_vote = listen(clientSocket);
-                        jsonRecv = (JSONObject)recv_status_vote;
-                        if(jsonRecv.get("status").equals("ok")) { 
-                            // success
-                        } else {
-                            // TODO : vote now unsuccesful
-                        }
+                        initVoteResponse("none");
                     }
                 }
                 isLeave = method.equals("leave");
@@ -440,6 +461,42 @@ public class Server extends Thread {
         }
         
         return counter;
+    }
+    
+    public ArrayList<Integer> getAlivePlayers(){
+        ArrayList<Integer> p = new ArrayList<>();
+        for  (int i=0; i<players.size(); i++) {
+            if (Integer.parseInt(players.get(i).get("is_alive").toString())==1) {
+                p.add(Integer.parseInt(players.get(i).get("player_id").toString()));
+            }
+        }
+        return p;
+    }
+    
+    public void initVoteResponse(String role) {
+        vote_response.clear();
+        if (role.equals("werewolf")){
+            vote_response.put(-1, true);
+        } else if (role.equals("civilian")){
+            vote_response.put(-1, false);
+        }
+        
+        for (int i=0; i<players.size(); i++){
+            vote_response.put(i, true);
+        }
+        
+        ArrayList<Integer> p = getAlivePlayers();
+        for (int i=0; i<p.size(); i++){
+            vote_response.replace(p.get(i), false);
+        }
+    }
+    
+    public boolean isVoteResponded(int id){
+        return vote_response.get(id);
+    }
+    
+    public void setVoteResponded(int id){
+        vote_response.replace(id, true);
     }
     
     public int electedKPU(){
