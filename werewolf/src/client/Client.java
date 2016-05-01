@@ -153,8 +153,7 @@ public class Client implements Runnable {
             }
             
             client.vote();
-            
-            break;
+            client.listenToServer();
         }
         
         //client.leaveGame();
@@ -481,8 +480,9 @@ public class Client implements Runnable {
                     }
                 }
                 else if(jsonRecv.get("method").equals("vote_civilian")) {
-                    votes.add(Integer.parseInt(jsonRecv.get("player_id").toString()));
-                    if(Client.players.size()-1 == i) break;
+                    this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
+                    // TODO ini harus diubah harusnya cuma diitung player yang masih hidup
+                    if(Client.players.size()-2 == i) break;
                 }
             }
         }
@@ -569,7 +569,7 @@ public class Client implements Runnable {
     }   
     
     public void civilianVoteInfo(JSONArray final_array) {
-        JSONObject recv = (JSONObject)listenToServer();
+        JSONObject recv;
         do { // send method
             JSONObject obj = new JSONObject();
             int player_id = getVoteResult();
@@ -582,8 +582,12 @@ public class Client implements Runnable {
                 obj.put("vote_status",-1);
             }
             obj.put("vote_result",final_array); //ini belom ditangani yg final_arraynya
-             
+            
+            System.out.println(obj.toJSONString());
+            
             sendToServer(obj);
+            
+            recv = (JSONObject)listenToServer();
             if(!recv.get("status").equals("ok")) {
                 System.out.println(recv.toJSONString());
             }
@@ -613,7 +617,7 @@ public class Client implements Runnable {
                 JSONParser parser = new JSONParser();
                 
                 JSONObject data = (JSONObject)parser.parse(players.get(i).toString());
-                if(data.get("player_id").equals(id)) {
+                if(Integer.parseInt(data.get("player_id").toString()) == id) {
                     return data.get("username").toString();
                 }
             
@@ -653,7 +657,7 @@ public class Client implements Runnable {
                         System.out.print("Siapa werewolf nya? ");
                         String voted_player = keyboard.nextLine();
 
-                        this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player)));
+                        this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
 
                         try {
                             t1.join();
@@ -661,7 +665,8 @@ public class Client implements Runnable {
                             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                         }
                         
-                        System.out.println("ONE KILLED "); this.getUsernameFromID(this.getVoteResult()); //ini masi bisa -1 loh haha
+                        System.out.println(votes.toString());
+                        System.out.println("ONE KILLED "+ this.getVoteResult() + "|" + this.getUsernameFromID(this.getVoteResult())); //ini masi bisa -1 loh haha
                         
                         JSONArray json_array = new JSONArray();
                         JSONArray final_array = new JSONArray();
@@ -673,9 +678,13 @@ public class Client implements Runnable {
                             json_array.remove(0);
                             json_array.remove(0);
                         }
+                        System.out.println(final_array.toJSONString());
+                        
                         if (isDay) {
+                            System.out.println("DAY");
                             civilianVoteInfo(final_array);
                         } else {
+                            System.out.println("NIGHT");
                             werewolfVoteInfo(final_array);
                         }
                         
