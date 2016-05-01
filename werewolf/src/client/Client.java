@@ -674,9 +674,9 @@ public class Client implements Runnable {
                         for (int j=0; j<votes.size(); j++) {
                             json_array.add(0, j);
                             json_array.add(1, votes.get(j));
-                            final_array.add(j, json_array);
-                            json_array.remove(0);
-                            json_array.remove(0);
+                            System.out.println(votes.toArray());
+                            final_array.add(json_array);
+                            json_array.clear();
                         }
                         System.out.println(final_array.toJSONString());
                         
