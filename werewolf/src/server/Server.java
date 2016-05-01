@@ -209,6 +209,15 @@ public class Server extends Thread {
                         temp.clear();
                         temp.put("method", "kpu_selected");
                         temp.put("kpu_id", kpu_id);
+                        send(clientSocket, temp);
+                        
+                        Object recv_status_kpu = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_kpu;
+                        if(jsonRecv.get("status").equals("ok")) {
+                            // success
+                        } else {
+                            // TODO: unsuccessful
+                        }
                     }
 
                 } else if (jsonRecv.get("method").equals("vote_result_werewolf")) {
