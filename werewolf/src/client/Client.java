@@ -649,6 +649,9 @@ public class Client implements Runnable {
                 System.out.println("Time to vote as "+this.player.getRole());
                 isDay = data.get("phase").equals("day");
 
+                System.out.println("KPU ID "+this.player.getKPUID());
+                System.out.println("YOUR ROLE IS "+this.player.getRole());
+
                 // SEND STATUS OK
                 data.clear();
                 data.put("status", "ok");
@@ -656,7 +659,7 @@ public class Client implements Runnable {
                 data.clear();
 
                 System.out.println("KPU ID "+this.player.getKPUID());
-                System.out.println("YOUR ROLE IS "+this.player.getRole());
+
                 if(this.player.getKPUID() == this.player.getID()) {
                     // KPU
                     Thread t1 = new Thread(this);
@@ -713,7 +716,13 @@ public class Client implements Runnable {
 
                 }
                 else {
-                    System.out.print("Siapa werewolf nya? ");
+                    if(this.player.getRole().equals("civilian")) {
+                        System.out.print("Siapa werewolf nya? ");
+                    }
+                    else {
+                        System.out.print("Siapa yang ingin kamu bunuh? ");
+                    }
+                    
                     String voted_player = keyboard.nextLine();
                     data.put("method","vote_civilian");
                     data.put("player_id", this.getIDFromUsername(voted_player));
