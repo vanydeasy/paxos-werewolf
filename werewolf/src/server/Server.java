@@ -93,7 +93,7 @@ public class Server extends Thread {
         do {
             if (!isVoteResponded(player_id)){
                 if (vote_response.containsKey(-1)){ // someone was killed
-                    if (vote_response.get(-1)){ // a werewolf was killed
+                    if (vote_response.get(-1)){ // vote_result_werewolf
                         changePhase();
                         
                         Object recv_status_phase = listen(clientSocket);
@@ -103,7 +103,7 @@ public class Server extends Thread {
                         } else {
                             // TODO: change phase into day unsuccessful
                         }
-                    } else { // a civilian was killed
+                    } else { // vote_result_civilian
                         changePhase();
                         
                         Object recv_status_phase = listen(clientSocket);
@@ -122,7 +122,7 @@ public class Server extends Thread {
                             // TODO: change phase into night unsuccessful
                         }
                     }
-                } else { // no one was killed
+                } else { // vote_result
                     if (isDay){
                         day_vote++;
                         if (day_vote < 2){ // voting done less than 2 times
