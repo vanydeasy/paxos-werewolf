@@ -247,7 +247,7 @@ public class Server extends Thread {
                             // TODO: change phase into day unsuccessful
                         }
                     }
-                } else if (jsonRecv.get("method").equals("vote_result_civillian")) {
+                } else if (jsonRecv.get("method").equals("vote_result_civilian")) {
                     if (!isPlaying){
                         temp.put("status", "fail");
                         temp.put("description", "the game hasn't started yet");
@@ -258,7 +258,7 @@ public class Server extends Thread {
                         send(clientSocket, temp);
                     } else {
                         temp.put("status", "ok");
-                        temp.put("description", "vote result for civillian recieved");
+                        temp.put("description", "vote result for civilian recieved");
                         send(clientSocket, temp);
                         
                         int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
