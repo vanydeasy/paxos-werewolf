@@ -656,27 +656,7 @@ public class Client implements Runnable {
                 data.clear();
 
                 System.out.println("KPU ID "+this.player.getKPUID());
-
-<<<<<<< HEAD
-                        try {
-                            t1.join();
-                        } catch (InterruptedException ex) {
-                            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                        
-                        System.out.println(votes.toString());
-                        System.out.println("ONE KILLED "+ this.getVoteResult() + "|" + this.getUsernameFromID(this.getVoteResult())); //ini masi bisa -1 loh haha
-                        
-                        JSONArray json_array = new JSONArray();
-                        JSONArray final_array = new JSONArray();
-                       
-                        for (int j=0; j<votes.size(); j++) {
-                            json_array.add(0, j);
-                            json_array.add(1, votes.get(j));
-                            System.out.println(votes.toArray());
-                            final_array.add(json_array);
-                            json_array.clear();
-=======
+                System.out.println("YOUR ROLE IS "+this.player.getRole());
                 if(this.player.getKPUID() == this.player.getID()) {
                     // KPU
                     Thread t1 = new Thread(this);
@@ -685,10 +665,9 @@ public class Client implements Runnable {
                     if(isDay) {
                         if(this.player.getRole().equals("civilian")) {
                             System.out.print("Siapa werewolf nya? ");
->>>>>>> add night shift
                         }
                         else {
-                            System.out.print("Siapa yang ingin kamu bunuh?");
+                            System.out.print("Siapa yang ingin kamu bunuh? ");
                         }
                         voted_player = keyboard.nextLine();
                         this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);

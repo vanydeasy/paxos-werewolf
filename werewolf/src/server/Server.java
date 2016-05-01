@@ -83,10 +83,8 @@ public class Server extends Thread {
         boolean isLeave = false;
         
         // Initialize vote_responded
-        vote_response.clear();
-        ArrayList<Integer> pl = getAlivePlayers();
-        for (int i=0; i<pl.size(); i++){
-            vote_response.put(pl.get(i), true);
+        for (int i=0; i<PLAYER_TO_PLAY; i++){
+            vote_response.put(i, true);
         }
         
         // Listening
@@ -485,7 +483,8 @@ public class Server extends Thread {
             vote_response.put(i, true);
         }
         
-        ArrayList<Integer> p = getAlivePlayers();
+        ArrayList<Integer> p = new ArrayList<>();
+        p = getAlivePlayers();
         for (int i=0; i<p.size(); i++){
             vote_response.replace(p.get(i), false);
         }
