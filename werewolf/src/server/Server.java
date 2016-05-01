@@ -42,6 +42,7 @@ public class Server extends Thread {
     private static int readyCount = 0; // number of ready clients
     private static int playerCount = 0; // number of players currently alive
     private int day = 0; // number of days
+    private int day_vote = 0; // number of voting time
     private boolean isDay = false;
     private boolean isPlaying = false;
     
@@ -150,18 +151,19 @@ public class Server extends Thread {
                         if(jsonRecv.get("status").equals("ok")) { // successfully start the game
                             // CHANGE PHASE
                             isDay = true;
+                            day_vote = 0;
                             temp.clear();
                             temp.put("method", "change_phase");
                             temp.put("time", "day");
                             temp.put("days", ++day);
-                            temp.put("description", "PUT NARRATION HERE");
+                            temp.put("description", "");
                             send(clientSocket, temp);
                             JSONObject status = (JSONObject)listen(clientSocket);
                             if(status.get("status").equals("ok")) { 
                                 //SUCCESS
                             }
                         } else {
-                            // start game unseccesful (mau diapain yah enaknya)
+                            // TODO: start game unseccesful
                         }
                     }
                 }
@@ -209,10 +211,21 @@ public class Server extends Thread {
                         
                         Object recv_status_kpu = listen(clientSocket);
                         jsonRecv = (JSONObject)recv_status_kpu;
-                        if(jsonRecv.get("status").equals("ok")) {
-                            // success
+                        if(jsonRecv.get("status").equals("ok")) { // success
+                            temp.clear();
+                            temp.put("method", "vote_now");
+                            temp.put("phase", "day");
+                            send(clientSocket, temp);
+                            
+                            Object recv_status_vote = listen(clientSocket);
+                            jsonRecv = (JSONObject)recv_status_vote;
+                            if(jsonRecv.get("status").equals("ok")) { 
+                                // success
+                            } else {
+                                // TODO : vote now unsuccesful
+                            }
                         } else {
-                            // TODO: unsuccessful
+                            // TODO: kpu selected unsuccessful
                         }
                     }
 
@@ -220,29 +233,169 @@ public class Server extends Thread {
                     if (!isPlaying){
                         temp.put("status", "fail");
                         temp.put("description", "the game hasn't started yet");
+                        send(clientSocket, temp);
+                    } else if (Integer.parseInt(jsonRecv.get("vote_status").toString()) == -1) {
+                        temp.put("status", "fail");
+                        temp.put("description", "wrong method");
+                        send(clientSocket, temp);
                     } else {
                         temp.put("status", "ok");
                         temp.put("description", "vote result for werewolf recieved");
+                        send(clientSocket, temp);
+                        
+                        int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
+                        for (int i = 0; i < players.size(); i++){
+                            JSONObject player = (JSONObject) players.get(i);
+                            if(Integer.parseInt(player.get("player_id").toString()) == killed) {
+                                JSONObject newplayer = new JSONObject();
+                                newplayer.put("player_id", killed);
+                                newplayer.put("is_alive", 0);
+                                newplayer.put("address", player.get("address").toString());
+                                newplayer.put("port", player.get("port").toString());
+                                newplayer.put("username", player.get("username").toString());
+                                newplayer.put("role", roles.get(killed));
+                                players.set(i, newplayer);
+                                break;
+                            }
+                        }
+                        
+                        // CHANGE PHASE
+                        temp.clear();
+                        isDay = true;
+                        day_vote = 0;
+                        temp.put("method", "change_phase");
+                        temp.put("time", "day");
+                        temp.put("days", ++day);
+                        temp.put("description", "");
+                        send(clientSocket, temp);
+                        
+                        Object recv_status_phase = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_phase;
+                        if(jsonRecv.get("status").equals("ok")) { 
+                            // success
+                        } else {
+                            // TODO: change phase into day unsuccessful
+                        }
                     }
-                    send(clientSocket, temp);
                 } else if (jsonRecv.get("method").equals("vote_result_civillian")) {
                     if (!isPlaying){
                         temp.put("status", "fail");
                         temp.put("description", "the game hasn't started yet");
+                        send(clientSocket, temp);
+                    } else if (Integer.parseInt(jsonRecv.get("vote_status").toString()) == -1) {
+                        temp.put("status", "fail");
+                        temp.put("description", "wrong method");
+                        send(clientSocket, temp);
                     } else {
                         temp.put("status", "ok");
                         temp.put("description", "vote result for civillian recieved");
+                        send(clientSocket, temp);
+                        
+                        int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
+                        for (int i = 0; i < players.size(); i++){
+                            JSONObject player = (JSONObject) players.get(i);
+                            if(Integer.parseInt(player.get("player_id").toString()) == killed) {
+                                JSONObject newplayer = new JSONObject();
+                                newplayer.put("player_id", killed);
+                                newplayer.put("is_alive", 0);
+                                newplayer.put("address", player.get("address").toString());
+                                newplayer.put("port", player.get("port").toString());
+                                newplayer.put("username", player.get("username").toString());
+                                newplayer.put("role", roles.get(killed));
+                                players.set(i, newplayer);
+                                break;
+                            }
+                        }
+                        
+                        // CHANGE PHASE
+                        temp.clear();
+                        isDay = false;
+                        temp.put("method", "change_phase");
+                        temp.put("time", "night");
+                        temp.put("days", day);
+                        temp.put("description", "");
+                        send(clientSocket, temp);
+                        
+                        Object recv_status_phase = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_phase;
+                        if(jsonRecv.get("status").equals("ok")) { // success
+                            temp.clear();
+                            temp.put("method", "vote_now");
+                            temp.put("phase", "night");
+                            send(clientSocket, temp);
+                            
+                            Object recv_status_vote = listen(clientSocket);
+                            jsonRecv = (JSONObject)recv_status_vote;
+                            if(jsonRecv.get("status").equals("ok")) { 
+                                // success
+                            } else {
+                                // TODO : vote now unsuccesful
+                            }
+                        } else {
+                            // TODO: change phase into night unsuccessful
+                        }
                     }
-                    send(clientSocket, temp);
                 } else if (jsonRecv.get("method").equals("vote_result")) {
                     if (!isPlaying){
                         temp.put("status", "fail");
                         temp.put("description", "the game hasn't started yet");
-                    } else {
+                        send(clientSocket, temp);
+                    } else if (Integer.parseInt(jsonRecv.get("vote_status").toString()) == 1) {
                         temp.put("status", "fail");
+                        temp.put("description", "wrong method");
+                        send(clientSocket, temp);
+                    } else {
+                        temp.put("status", "ok");
                         temp.put("description", "no one is killed");
+                        send(clientSocket, temp);
+                        
+                        temp.clear();
+                        if (isDay){
+                            day_vote++;
+                            if (day_vote < 2){ // voting done less than 2 times
+                                temp.put("method", "vote_now");
+                                temp.put("phase", "day");
+                            } else {
+                                // CHANGE PHASE
+                                isDay = false;
+                                temp.put("method", "change_phase");
+                                temp.put("time", "night");
+                                temp.put("days", day);
+                                temp.put("description", "");
+                                
+                                Object recv_status_phase = listen(clientSocket);
+                                jsonRecv = (JSONObject)recv_status_phase;
+                                if(jsonRecv.get("status").equals("ok")) { // success
+                                    temp.clear();
+                                    temp.put("method", "vote_now");
+                                    temp.put("phase", "night");
+                                    send(clientSocket, temp);
+
+                                    Object recv_status_vote = listen(clientSocket);
+                                    jsonRecv = (JSONObject)recv_status_vote;
+                                    if(jsonRecv.get("status").equals("ok")) { 
+                                        // success
+                                    } else {
+                                        // TODO : vote now unsuccesful
+                                    }
+                                } else {
+                                    // TODO: change phase into night unsuccessful
+                                }
+                            }
+                        } else {
+                            temp.put("method", "vote_now");
+                            temp.put("phase", "night");
+                        }
+                        send(clientSocket, temp);
+                        
+                        Object recv_status_vote = listen(clientSocket);
+                        jsonRecv = (JSONObject)recv_status_vote;
+                        if(jsonRecv.get("status").equals("ok")) { 
+                            // success
+                        } else {
+                            // TODO : vote now unsuccesful
+                        }
                     }
-                    send(clientSocket, temp);
                 }
                 isLeave = method.equals("leave");
             }
