@@ -330,6 +330,7 @@ public class Server extends Thread {
     public void gameOver (String winner) {
         JSONObject recv;
         do { // send method
+            
             JSONObject obj = new JSONObject();
             obj.put("method","game_over");
             obj.put("phase",winner);
