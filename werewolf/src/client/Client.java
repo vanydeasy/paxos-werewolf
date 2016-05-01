@@ -85,8 +85,8 @@ public class Client implements Runnable {
         while(true) {
             System.out.println("YOUR ROLE IS "+client.player.getRole());
             if(client.isDay) {
-                if(client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-2)).get("player_id")
-                    || client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-1)).get("player_id")) {
+                if(client.player.getID() == Integer.parseInt(((JSONObject)Client.players.get(Client.players.size()-2)).get("player_id").toString())
+                    || client.player.getID() == Integer.parseInt(((JSONObject)Client.players.get(Client.players.size()-1)).get("player_id").toString())) {
                     // PROPOSER pid dua terbesar (player ke n dan n­1) 
                     client.player.setProposer(true);
 
@@ -103,8 +103,8 @@ public class Client implements Runnable {
                     t1.start();
 
                     for(int i=0;i<Client.players.size();i++) {
-                        String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
-                        int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
+                        String ipAddress = ((JSONObject)Client.players.get(i)).get("address").toString();
+                        int port = Integer.parseInt(((JSONObject)Client.players.get(i)).get("port").toString());
                         if ( port != client.player.getUDPPort()){
                             client.sendToUDP(ipAddress, port, sendData);
                         }
@@ -125,8 +125,8 @@ public class Client implements Runnable {
                     sendData = sent.toJSONString();
                     for(int i=0;i<Client.players.size();i++) {
                         // PAXOS ACCEPT PROPOSAL
-                        String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
-                        int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
+                        String ipAddress = ((JSONObject)Client.players.get(i)).get("address").toString();
+                        int port = Integer.parseInt(((JSONObject)Client.players.get(i)).get("port").toString());
                         if ( port != client.player.getUDPPort()){
                             client.sendToUDP(ipAddress, port, sendData);
                         }
@@ -256,12 +256,6 @@ public class Client implements Runnable {
                     obj.put("method","join");
                     sendToServer(obj);
                     
-                    try {
-                        udpSocket = new DatagramSocket(udp_port);
-                    } catch (SocketException ex) {
-                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    
                     obj = (JSONObject)listenToServer();
                     if(obj.get("status")==null) break;
                 } catch (UnknownHostException ex) {
@@ -269,6 +263,12 @@ public class Client implements Runnable {
                 }
             } while(obj.get("status").equals("fail"));
             
+            try {
+                udpSocket = new DatagramSocket(udp_port);
+            } catch (SocketException ex) {
+                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
             // Mendapatkan player id dari server
             int player_id = (Integer)obj.get("player_id");
             this.player = new Player(player_id, username, Inet4Address.getLocalHost().getHostAddress(), udp_port);
@@ -296,9 +296,14 @@ public class Client implements Runnable {
         if(recv.get("method").equals("start")) {
             isDay = recv.get("time").equals("day");
             player.setRole(recv.get("role").toString());
-            if(recv.get("friends")!=null)
+            System.out.println("YOUR ROLE IS " + player.getRole());
+            if(recv.get("friends")!=null) {
                 friends = (ArrayList)recv.get("friends");
-
+                System.out.println("YOUR FRIENDS ARE ");
+                for(String friend : friends)
+                    System.out.print(friend+" ");
+                System.out.println("");
+            }
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
             sendToServer(obj);
@@ -351,8 +356,6 @@ public class Client implements Runnable {
     @Override
     public void run() {
         // Used for listening to socket
-        System.out.println ("Running the listening thread");
-        
         int num_proposal = 0;
         String str_prop_1 = "{}"; 
         int size;
@@ -646,11 +649,7 @@ public class Client implements Runnable {
         if(data.get("method") != null) {
             if(data.get("method").equals("vote_now")) {
                 
-                System.out.println("Time to vote as "+this.player.getRole());
                 isDay = data.get("phase").equals("day");
-
-                System.out.println("KPU ID "+this.player.getKPUID());
-                System.out.println("YOUR ROLE IS "+this.player.getRole());
 
                 // SEND STATUS OK
                 data.clear();
@@ -658,29 +657,27 @@ public class Client implements Runnable {
                 this.sendToServer(data);
                 data.clear();
 
-                System.out.println("KPU ID "+this.player.getKPUID());
-
                 if(this.player.getKPUID() == this.player.getID()) {
-                    // KPU
+                    System.out.println("I AM THE KPU FOR TODAY");
                     Thread t1 = new Thread(this);
                     t1.start();
                     String voted_player;
                     if(isDay) {
                         if(this.player.getRole().equals("civilian")) {
-                            System.out.print("Siapa werewolf nya? ");
+                            System.out.print("Who is the werewolf? ");
                         }
                         else {
-                            System.out.print("Siapa yang ingin kamu bunuh? ");
+                            System.out.print("Who will you kill? ");
                         }
                         voted_player = keyboard.nextLine();
                         this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
                     }
                     else {
                         if(this.player.getRole().equals("civilian")) {
-                            System.out.println("You are sleeping...");
+                            System.out.println("You cannot vote. You are sleeping...");
                         }
                         else {
-                            System.out.print("Civilian mana yang ingin kamu bunuh? ");
+                            System.out.print("Which civilian you are going to kill? ");
                             voted_player = keyboard.nextLine();
                             this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
                         }
@@ -705,20 +702,18 @@ public class Client implements Runnable {
                     }
 
                     if (isDay) {
-                        System.out.println("DAY");
                         civilianVoteInfo(final_array);
                     } else {
-                        System.out.println("NIGHT");
                         werewolfVoteInfo(final_array);
                     }
 
                 }
                 else {
                     if(this.player.getRole().equals("civilian")) {
-                        System.out.print("Siapa werewolf nya? ");
+                        System.out.print("Who is the werewolf? ");
                     }
                     else {
-                        System.out.print("Siapa yang ingin kamu bunuh? ");
+                        System.out.print("Who will you kill? ");
                     }
                     
                     String voted_player = keyboard.nextLine();
