@@ -479,11 +479,13 @@ public class Server extends Thread {
         
         for (int i = smallest_id+1; i<players.size(); i++){
             if (Integer.parseInt(players.get(i).get("is_alive").toString()) == 1){
-                if (proposed_kpu_id.get(i) == candidate1_id){
-                    candidate1_count++;
-                } else {
-                    candidate2_id = proposed_kpu_id.get(i);
-                    candidate2_count++;
+                if(proposed_kpu_id.get(i) != null) {
+                   if (proposed_kpu_id.get(i) == candidate1_id){
+                        candidate1_count++;
+                    } else {
+                        candidate2_id = proposed_kpu_id.get(i);
+                        candidate2_count++;
+                    } 
                 }
             }
         }

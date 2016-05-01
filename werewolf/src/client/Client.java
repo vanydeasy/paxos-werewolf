@@ -364,15 +364,15 @@ public class Client implements Runnable {
     
     public void leaveGame() {
         JSONObject recv;
-        do { // send method = leave until client may leave
-            JSONObject obj = new JSONObject();
-            obj.put("method","leave");
-            sendToServer(obj);
-            recv = (JSONObject)listenToServer();
+        JSONObject obj = new JSONObject();
+        obj.put("method","leave");
+        sendToServer(obj);
+        recv = (JSONObject)listenToServer();
+        if(recv.get("status") != null) {
             if(!recv.get("status").equals("ok")) {
                 System.out.println(recv.toJSONString());
             }
-        } while(!recv.get("status").equals("ok"));
+        }
     }
     
     @Override
@@ -411,7 +411,8 @@ public class Client implements Runnable {
                 } else if (jsonRecv.get("method").equals("accept_proposal")) {
                     if(num_proposal < 2) {
                         num_proposal++;
-
+                        System.out.println("ACCEPT PROPOSAL "+num_proposal);
+                        
                         if(num_proposal == 2 && !this.player.isProposer()) {
                             try {
                                 proposal_1 = (JSONObject)parser.parse(str_prop_1);
@@ -681,13 +682,17 @@ public class Client implements Runnable {
             t1.start();
             String voted_player;
             if(isDay && this.player.isAlive()) {
-                if(this.player.getRole().equals("civilian")) {
-                    System.out.print("Who is the werewolf? ");
+                while(true) {
+                    if(this.player.getRole().equals("civilian")) {
+                        System.out.print("Who is the werewolf? ");
+                    }
+                    else {
+                        System.out.print("Who will you kill? ");
+                    }
+                    voted_player = keyboard.nextLine();
+                    if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) break;
+                    System.out.println(voted_player+" already died. Choose another player!");
                 }
-                else {
-                    System.out.print("Who will you kill? ");
-                }
-                voted_player = keyboard.nextLine();
                 this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
             }
             else if(!isDay && this.player.isAlive()) {
@@ -695,8 +700,12 @@ public class Client implements Runnable {
                     System.out.println("You cannot vote. You are sleeping...");
                 }
                 else {
-                    System.out.print("Which civilian you are going to kill? ");
-                    voted_player = keyboard.nextLine();
+                    while(true) {
+                        System.out.print("Which civilian you are going to kill? ");
+                        voted_player = keyboard.nextLine();
+                        if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) break;
+                        System.out.println(voted_player+" already died. Choose another player!");
+                    }
                     this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
                 }
             }
@@ -729,13 +738,18 @@ public class Client implements Runnable {
         }
         else {
             if(isDay && this.player.isAlive()) {
-                if(this.player.getRole().equals("civilian")) {
-                    System.out.print("Who is the werewolf? ");
+                String voted_player = null;
+                while(true) {
+                    if(this.player.getRole().equals("civilian")) {
+                        System.out.print("Who is the werewolf? ");
+                    }
+                    else {
+                        System.out.print("Who will you kill? ");
+                    }
+                    voted_player = keyboard.nextLine();
+                    if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) break;
+                    System.out.println(voted_player+" already died. Choose another player!");
                 }
-                else {
-                    System.out.print("Who will you kill? ");
-                }
-                String voted_player = keyboard.nextLine();
                 data.put("method","vote_civilian");
                 data.put("player_id", this.getIDFromUsername(voted_player));
                 this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
@@ -745,8 +759,13 @@ public class Client implements Runnable {
                     System.out.print("You cannot vote. You are sleeping...");
                 }
                 else {
-                    System.out.print("Who will you kill tonight? ");
-                    String voted_player = keyboard.nextLine();
+                    String voted_player = null;
+                    while(true) {
+                        System.out.print("Who will you kill tonight? ");
+                        voted_player = keyboard.nextLine();
+                        if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) break;
+                        System.out.println(voted_player+" already died. Choose another player!");
+                    }
                     data.put("method","vote_werewolf");
                     data.put("player_id", this.getIDFromUsername(voted_player));
                     this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
@@ -774,8 +793,7 @@ public class Client implements Runnable {
     
     public int getDeadWerewolf() {
         int counter = 0;
-        System.out.println("ALIVE WEREWOLVES "+players.toJSONString());
-        for  (int i=0; i<players.size(); i++) {
+        for (int i=0; i<players.size(); i++) {
             if (Integer.parseInt(((JSONObject)players.get(i)).get("is_alive").toString())==0) {
                 JSONObject player = (JSONObject)players.get(i);
                 if(player != null) {
@@ -790,5 +808,14 @@ public class Client implements Runnable {
         }
         
         return counter;
+    }
+    
+    public boolean isPlayerAlive(int id) {
+        for(int i=0; i<players.size(); i++) {
+            if (Integer.parseInt(((JSONObject)players.get(i)).get("player_id").toString())==id) {
+                return Integer.parseInt(((JSONObject)players.get(i)).get("is_alive").toString())==1;
+            }
+        }
+        return true;
     }
 }
