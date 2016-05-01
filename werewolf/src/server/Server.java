@@ -254,7 +254,13 @@ public class Server extends Thread {
                         killPlayer(killed);
                         
                         for (int i = 0; i < players.size(); i++){
-                            changePhase("day", client_socket.get(i));
+                            if (getAliveWerewolfNumber() == 0){
+                                gameOver("werewolf");
+                            } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
+                                gameOver("civilian");
+                            } else {
+                                changePhase("day", client_socket.get(i));
+                            }
                         }
                     }
                 } else if (jsonRecv.get("method").equals("vote_result_civilian")) {
@@ -275,7 +281,13 @@ public class Server extends Thread {
                         killPlayer(killed);
                         
                         for (int i = 0; i < players.size(); i++){
-                            changePhase("night", client_socket.get(i));
+                            if (getAliveWerewolfNumber() == 0){
+                                gameOver("werewolf");
+                            } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
+                                gameOver("civilian");
+                            } else {
+                                changePhase("day", client_socket.get(i));
+                            }
                         }
                     }
                 } else if (jsonRecv.get("method").equals("vote_result")) {
@@ -298,7 +310,13 @@ public class Server extends Thread {
                                 if (day_vote < 2){ // voting done less than 2 times
                                     voteNow("day", client_socket.get(i));
                                 } else {
-                                    changePhase("night", client_socket.get(i));
+                                    if (getAliveWerewolfNumber() == 0){
+                                        gameOver("werewolf");
+                                    } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
+                                        gameOver("civilian");
+                                    } else {
+                                        changePhase("day", client_socket.get(i));
+                                    }
                                 }
                             } else {
                                 voteNow("night", client_socket.get(i));
@@ -373,28 +391,18 @@ public class Server extends Thread {
     }
     
     public void gameOver (String winner) {
-        JSONObject recv;
-        do { // send method
-            
-            JSONObject obj = new JSONObject();
-            obj.put("method","game_over");
-            obj.put("phase",winner);
-            obj.put("description","HAHA"); //@TODO ubah deskripsi
-            
-            send(clientSocket, obj);   
-            recv = (JSONObject) listen(clientSocket);
-         
-            if(!recv.get("status").equals("ok")) {
-                System.out.println(recv.toJSONString());
-            }
-        } while(!recv.get("status").equals("ok"));
+        JSONObject obj = new JSONObject();
+        obj.put("method","game_over");
+        obj.put("winner",winner);
+        obj.put("description","");
+        send(clientSocket, obj);
     }
     
     public int getDeadPlayers() {
         int counter = 0;
         
         for  (int i=0; i<players.size(); i++) {
-            if (Integer.parseInt(players.get(i).get("is_alive").toString())==0) {
+            if (Integer.parseInt(players.get(i).get("is_alive").toString()) == 0) {
                 counter++;
             }
         }
@@ -406,8 +414,36 @@ public class Server extends Thread {
         int counter = 0;
         
         for  (int i=0; i<players.size(); i++) {
-            if (Integer.parseInt(players.get(i).get("is_alive").toString())==0) {
+            if (Integer.parseInt(players.get(i).get("is_alive").toString()) == 0) {
                 if (players.get(i).get("role").toString().equals("werewolf")) {
+                    counter++;
+                }
+            }
+        }
+        
+        return counter;
+    }
+    
+    public int getAliveCivilianNumber() {
+        int counter = 0;
+        
+        for  (int i=0; i<players.size(); i++) {
+            if (Integer.parseInt(players.get(i).get("is_alive").toString()) == 1) {
+                if (roles.get(i).equals("civilian")) {
+                    counter++;
+                }
+            }
+        }
+        
+        return counter;
+    }
+    
+    public int getAliveWerewolfNumber() {
+        int counter = 0;
+        
+        for  (int i=0; i<players.size(); i++) {
+            if (Integer.parseInt(players.get(i).get("is_alive").toString()) == 1) {
+                if (roles.get(i).equals("werewolf")) {
                     counter++;
                 }
             }
@@ -419,7 +455,7 @@ public class Server extends Thread {
     public ArrayList<Integer> getAlivePlayers(){
         ArrayList<Integer> p = new ArrayList<>();
         for  (int i=0; i<players.size(); i++) {
-            if (Integer.parseInt(players.get(i).get("is_alive").toString())==1) {
+            if (Integer.parseInt(players.get(i).get("is_alive").toString()) == 1) {
                 p.add(Integer.parseInt(players.get(i).get("player_id").toString()));
             }
         }
