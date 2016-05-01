@@ -657,7 +657,23 @@ public class Client implements Runnable {
                             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                         }
                         
-                        System.out.println("ONE KILLED "); this.getUsernameFromID(this.getVoteResult());
+                        System.out.println("ONE KILLED "); this.getUsernameFromID(this.getVoteResult()); //ini masi bisa -1 loh haha
+                        
+                        JSONArray json_array = new JSONArray();
+                        JSONArray final_array = new JSONArray();
+                       
+                        for (int j=0; j<votes.size(); j++) {
+                            json_array.add(0, j);
+                            json_array.add(1, votes.get(j));
+                            final_array.add(j, json_array);
+                            json_array.remove(0);
+                            json_array.remove(0);
+                        }
+                        if (isDay) {
+                            civilianVoteInfo(final_array);
+                        } else {
+                            werewolfVoteInfo(final_array);
+                        }
                         
                     }
                     else {
