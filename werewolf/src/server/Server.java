@@ -183,7 +183,7 @@ public class Server extends Thread {
                     } else {
                         temp.put("status", "ok");
                         temp.put("description", "proposal recieved");
-                        proposed_kpu_id.put(player_id, (Integer)jsonRecv.get("kpu_id"));
+                        proposed_kpu_id.put(player_id, Integer.parseInt(jsonRecv.get("kpu_id").toString()));
                     }
                     send(clientSocket, temp);
 
