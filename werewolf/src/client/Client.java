@@ -39,12 +39,12 @@ public class Client implements Runnable {
     public String SERVER_HOSTNAME;
     public int COMM_PORT;  // socket port for client comms
     
-    private static JSONArray players = new JSONArray();
-    private Player player;
-    private ArrayList<String> friends = new ArrayList<String>();
+    private static JSONArray players = new JSONArray(); // lists of players
+    private Player player; // client as player
+    private ArrayList<String> friends = new ArrayList<String>(); // player's friends (werewolf only)
     
-    private boolean isDay;
-    private int day = 0;
+    private boolean isDay; // return true when day
+    private int day = 0; // number of days
     
     private List<Integer> votes = new ArrayList<Integer>();
     
@@ -74,7 +74,6 @@ public class Client implements Runnable {
 
         //mulai game malam, werewolf saling kenal
         client.startGame();
-        System.out.println("START GAME");
         
         //siang
         client.changePhase();
@@ -98,6 +97,12 @@ public class Client implements Runnable {
                 Thread t1 = new Thread(client);
                 t1.start();
                 
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                
                 for(int i=0;i<client.players.size();i++) {
                     String ipAddress = (String)((JSONObject)client.players.get(i)).get("address");
                     int port = (Integer)((JSONObject)client.players.get(i)).get("port");
@@ -108,13 +113,18 @@ public class Client implements Runnable {
                 
                 try {
                     t1.join();
-                    System.out.println("Thread died");
                 } catch (InterruptedException ex) {
                     Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                 }
                 
                 Thread t2 = new Thread(client);
                 t2.start();
+                
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
                 
                 sent.clear();
                 sent.put("method", "accept_proposal");
@@ -131,7 +141,6 @@ public class Client implements Runnable {
                 
                 try {
                     t2.join();
-                    System.out.println("Thread died");
                 } catch (InterruptedException ex) {
                     Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -143,20 +152,19 @@ public class Client implements Runnable {
                     System.out.println("\nYou cannot propose");
                     Thread t1 = new Thread(client);
                     t1.start();
-
                     t1.join();
                     
                     Thread t2 = new Thread(client);
                     t2.start();
-
                     t2.join();
                 } catch (InterruptedException ex) {
                     Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
+            break;
         }
         
-        //client.leaveGame();
+        client.leaveGame();
     }
     
     public void connectToServer() { // Connect client to server (binding)
@@ -351,10 +359,15 @@ public class Client implements Runnable {
         // Used for listening to socket
         System.out.println ("Running the listening thread");
         
-        for(int i = 0; i < this.players.size()-1; i++) {
+        int num_proposal = 0;
+        String str_prop_1 = "{}"; 
+        int size;
+        
+        if(this.player.isProposer()) size = players.size();
+        else size = players.size()-1;
+        
+        for(int i = 0; i < size; i++) {
             JSONObject proposal_1 = null;
-            int num_proposal = 0;
-
             String recv = listenToUDP();
 
             JSONParser parser = new JSONParser();
@@ -368,6 +381,7 @@ public class Client implements Runnable {
             JSONObject temp = new JSONObject();
             if(jsonRecv.get("method") != null) {
                 if(jsonRecv.get("method").equals("prepare_proposal")){
+                    temp.put("from", this.player.getUDPPort());
                     temp.put("status", "ok");
                     temp.put("description", "accepted");
                     temp.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
@@ -381,6 +395,11 @@ public class Client implements Runnable {
                         num_proposal++;
 
                         if(num_proposal == 2 && !this.player.isProposer()) {
+                            try {
+                                proposal_1 = (JSONObject)parser.parse(str_prop_1);
+                            } catch (ParseException ex) {
+                                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                            }
                             String prop_1 = (String)proposal_1.get("proposal_id");
                             String prop_2 = (String)jsonRecv.get("proposal_id");
 
@@ -401,15 +420,15 @@ public class Client implements Runnable {
                                 this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
                             }
                             else if(proposal_id_1 < proposal_id_2) {
-                                temp.put("status", "ok");
-                                temp.put("description", "accepted");
-                                String sendData = temp.toJSONString();
-                                this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
-                                temp.clear();
                                 temp.put("status", "fail");
                                 temp.put("description", "rejected");
-                                sendData = temp.toJSONString();
+                                String sendData = temp.toJSONString();
                                 this.sendToUDP(this.getPlayerAddress(player_id_1), this.getPlayerPort(player_id_1), sendData);
+                                temp.clear();
+                                temp.put("status", "ok");
+                                temp.put("description", "accepted");
+                                sendData = temp.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_id_2), this.getPlayerPort(player_id_2), sendData);
                             }
                             else { //proposal_id_1 == proposal_id_2
                                 if(player_id_1 < player_id_2) {
@@ -431,19 +450,14 @@ public class Client implements Runnable {
 
                         }
                         else if(num_proposal == 1 && !this.player.isProposer()) {
-                            proposal_1 = jsonRecv;
+                            str_prop_1 = jsonRecv.toJSONString();
                         }
                         else if(num_proposal == 1 && this.player.isProposer()) {
                             String proposal = (String)jsonRecv.get("proposal_id");
                             int proposal_id = Integer.parseInt(proposal.substring(proposal.indexOf(',')+1, proposal.indexOf(')')));
-                            temp.put("status", "ok");
-                            temp.put("description", "accepted");
-                            String sendData = temp.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
-                            temp.clear();
                             temp.put("status", "fail");
                             temp.put("description", "rejected");
-                            sendData = temp.toJSONString();
+                            String sendData = temp.toJSONString();
                             this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
                         }
                     }

@@ -39,10 +39,9 @@ public class UnreliableSender
     public void send(DatagramPacket packet, double fault) throws IOException {
         double rand = random.nextDouble();
 
-        System.out.println("Sending the package");
-
         if (rand < fault) {
-                datagramSocket.send(packet);
+            datagramSocket.send(packet);
+            System.out.println("Sending the package");
         }
 
         datagramSocket.close();
