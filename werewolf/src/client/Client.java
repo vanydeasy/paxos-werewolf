@@ -625,6 +625,11 @@ public class Client implements Runnable {
     }
     
     public void vote() {
+        votes.clear();
+        for (int i=0; i<6; i++) {
+            votes.add(0);
+        }
+        
         JSONObject data = (JSONObject)this.listenToServer();
         Scanner keyboard = new Scanner(System.in);
         do {
@@ -644,7 +649,7 @@ public class Client implements Runnable {
                         System.out.print("Siapa werewolf nya? ");
                         String voted_player = keyboard.nextLine();
 
-                        this.votes.add(this.getIDFromUsername(voted_player));
+                        this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player)));
 
                         try {
                             t1.join();
