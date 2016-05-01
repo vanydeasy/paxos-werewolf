@@ -150,20 +150,13 @@ public class Server extends Thread {
                         jsonRecv = (JSONObject)recv_status_start;
                         if(jsonRecv.get("status").equals("ok")) { // successfully start the game
                             // CHANGE PHASE
-                            isDay = true;
-                            day_vote = 0;
-                            temp.clear();
-                            temp.put("method", "change_phase");
-                            temp.put("time", "day");
-                            temp.put("days", ++day);
-                            temp.put("description", "");
-                            send(clientSocket, temp);
+                            changePhase();
                             JSONObject status = (JSONObject)listen(clientSocket);
                             if(status.get("status").equals("ok")) { 
-                                //SUCCESS
+                                // success
                             }
                         } else {
-                            // TODO: start game unseccesful
+                            // TODO: start game unsuccesful
                         }
                     }
                 }
@@ -212,10 +205,7 @@ public class Server extends Thread {
                         Object recv_status_kpu = listen(clientSocket);
                         jsonRecv = (JSONObject)recv_status_kpu;
                         if(jsonRecv.get("status").equals("ok")) { // success
-                            temp.clear();
-                            temp.put("method", "vote_now");
-                            temp.put("phase", "day");
-                            send(clientSocket, temp);
+                            voteNow("day");
                             
                             Object recv_status_vote = listen(clientSocket);
                             jsonRecv = (JSONObject)recv_status_vote;
@@ -244,30 +234,10 @@ public class Server extends Thread {
                         send(clientSocket, temp);
                         
                         int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
-                        for (int i = 0; i < players.size(); i++){
-                            JSONObject player = (JSONObject) players.get(i);
-                            if(Integer.parseInt(player.get("player_id").toString()) == killed) {
-                                JSONObject newplayer = new JSONObject();
-                                newplayer.put("player_id", killed);
-                                newplayer.put("is_alive", 0);
-                                newplayer.put("address", player.get("address").toString());
-                                newplayer.put("port", player.get("port").toString());
-                                newplayer.put("username", player.get("username").toString());
-                                newplayer.put("role", roles.get(killed));
-                                players.set(i, newplayer);
-                                break;
-                            }
-                        }
+                        killPlayer(killed);
                         
                         // CHANGE PHASE
-                        temp.clear();
-                        isDay = true;
-                        day_vote = 0;
-                        temp.put("method", "change_phase");
-                        temp.put("time", "day");
-                        temp.put("days", ++day);
-                        temp.put("description", "");
-                        send(clientSocket, temp);
+                        changePhase();
                         
                         Object recv_status_phase = listen(clientSocket);
                         jsonRecv = (JSONObject)recv_status_phase;
@@ -292,37 +262,15 @@ public class Server extends Thread {
                         send(clientSocket, temp);
                         
                         int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
-                        for (int i = 0; i < players.size(); i++){
-                            JSONObject player = (JSONObject) players.get(i);
-                            if(Integer.parseInt(player.get("player_id").toString()) == killed) {
-                                JSONObject newplayer = new JSONObject();
-                                newplayer.put("player_id", killed);
-                                newplayer.put("is_alive", 0);
-                                newplayer.put("address", player.get("address").toString());
-                                newplayer.put("port", player.get("port").toString());
-                                newplayer.put("username", player.get("username").toString());
-                                newplayer.put("role", roles.get(killed));
-                                players.set(i, newplayer);
-                                break;
-                            }
-                        }
+                        killPlayer(killed);
                         
                         // CHANGE PHASE
-                        temp.clear();
-                        isDay = false;
-                        temp.put("method", "change_phase");
-                        temp.put("time", "night");
-                        temp.put("days", day);
-                        temp.put("description", "");
-                        send(clientSocket, temp);
+                        changePhase();
                         
                         Object recv_status_phase = listen(clientSocket);
                         jsonRecv = (JSONObject)recv_status_phase;
                         if(jsonRecv.get("status").equals("ok")) { // success
-                            temp.clear();
-                            temp.put("method", "vote_now");
-                            temp.put("phase", "night");
-                            send(clientSocket, temp);
+                            voteNow("night");
                             
                             Object recv_status_vote = listen(clientSocket);
                             jsonRecv = (JSONObject)recv_status_vote;
@@ -353,23 +301,15 @@ public class Server extends Thread {
                         if (isDay){
                             day_vote++;
                             if (day_vote < 2){ // voting done less than 2 times
-                                temp.put("method", "vote_now");
-                                temp.put("phase", "day");
+                                voteNow("day");
                             } else {
                                 // CHANGE PHASE
-                                isDay = false;
-                                temp.put("method", "change_phase");
-                                temp.put("time", "night");
-                                temp.put("days", day);
-                                temp.put("description", "");
+                                changePhase();
                                 
                                 Object recv_status_phase = listen(clientSocket);
                                 jsonRecv = (JSONObject)recv_status_phase;
                                 if(jsonRecv.get("status").equals("ok")) { // success
-                                    temp.clear();
-                                    temp.put("method", "vote_now");
-                                    temp.put("phase", "night");
-                                    send(clientSocket, temp);
+                                    voteNow("night");
 
                                     Object recv_status_vote = listen(clientSocket);
                                     jsonRecv = (JSONObject)recv_status_vote;
@@ -383,8 +323,7 @@ public class Server extends Thread {
                                 }
                             }
                         } else {
-                            temp.put("method", "vote_now");
-                            temp.put("phase", "night");
+                            voteNow("night");
                         }
                         send(clientSocket, temp);
                         
@@ -459,27 +398,6 @@ public class Server extends Thread {
         return players.stream().anyMatch((temp) -> (temp.get("username").equals(username)));
     }
     
-    public void voteNow(boolean isDay) {
-        JSONObject recv;
-        do { // send method
-            JSONObject obj = new JSONObject();
-            obj.put("method","vote_now");
-            if (isDay) {
-                obj.put("phase",isDay);
-            } else {
-                obj.put("phase","night");
-            }
-            
-            send(clientSocket, obj);
-            
-            recv = (JSONObject) listen(clientSocket);
-         
-            if(!recv.get("status").equals("ok")) {
-                System.out.println(recv.toJSONString());
-            }
-        } while(!recv.get("status").equals("ok"));
-    }
-    
     public void gameOver (String winner) {
         JSONObject recv;
         do { // send method
@@ -551,6 +469,48 @@ public class Server extends Thread {
             return candidate2_id;
         } else { // jika jumlah vote sama, otomatis kandidat pertama terpilih
             return candidate1_id;
+        }
+    }
+    
+    public void changePhase(){
+        isDay = !isDay;
+        
+        JSONObject temp = new JSONObject();
+        temp.put("method", "change_phase");
+        if (isDay){
+            day_vote = 0;
+            temp.put("time", "day");
+            temp.put("days", ++day);
+        } else {
+            temp.put("time", "night");
+            temp.put("days", day);
+        }
+        temp.put("description", "");
+        
+        send(clientSocket, temp);
+    }
+    
+    public void voteNow(String day){
+        JSONObject temp = new JSONObject();
+        temp.put("method", "vote_now");
+        temp.put("phase", day);
+        send(clientSocket, temp);
+    }
+    
+    public void killPlayer(int killed){
+        for (int i = 0; i < players.size(); i++){
+            JSONObject player = (JSONObject) players.get(i);
+            if(Integer.parseInt(player.get("player_id").toString()) == killed) {
+                JSONObject newplayer = new JSONObject();
+                newplayer.put("player_id", killed);
+                newplayer.put("is_alive", 0);
+                newplayer.put("address", player.get("address").toString());
+                newplayer.put("port", player.get("port").toString());
+                newplayer.put("username", player.get("username").toString());
+                newplayer.put("role", roles.get(killed));
+                players.set(i, newplayer);
+                break;
+            }
         }
     }
     
