@@ -85,8 +85,8 @@ public class Client implements Runnable {
         while(true) {
             System.out.println("YOUR ROLE IS "+client.player.getRole());
             if(client.isDay) {
-                if(client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-2)).get("player_id")
-                    || client.player.getID() == (Integer)((JSONObject)Client.players.get(Client.players.size()-1)).get("player_id")) {
+                if(client.player.getID() == Integer.parseInt(((JSONObject)Client.players.get(Client.players.size()-2)).get("player_id").toString())
+                    || client.player.getID() == Integer.parseInt(((JSONObject)Client.players.get(Client.players.size()-1)).get("player_id").toString())) {
                     // PROPOSER pid dua terbesar (player ke n dan n­1) 
                     client.player.setProposer(true);
 
@@ -103,8 +103,8 @@ public class Client implements Runnable {
                     t1.start();
 
                     for(int i=0;i<Client.players.size();i++) {
-                        String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
-                        int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
+                        String ipAddress = ((JSONObject)Client.players.get(i)).get("address").toString();
+                        int port = Integer.parseInt(((JSONObject)Client.players.get(i)).get("port").toString());
                         if ( port != client.player.getUDPPort()){
                             client.sendToUDP(ipAddress, port, sendData);
                         }
@@ -125,8 +125,8 @@ public class Client implements Runnable {
                     sendData = sent.toJSONString();
                     for(int i=0;i<Client.players.size();i++) {
                         // PAXOS ACCEPT PROPOSAL
-                        String ipAddress = (String)((JSONObject)Client.players.get(i)).get("address");
-                        int port = (Integer)((JSONObject)Client.players.get(i)).get("port");
+                        String ipAddress = ((JSONObject)Client.players.get(i)).get("address").toString();
+                        int port = Integer.parseInt(((JSONObject)Client.players.get(i)).get("port").toString());
                         if ( port != client.player.getUDPPort()){
                             client.sendToUDP(ipAddress, port, sendData);
                         }
