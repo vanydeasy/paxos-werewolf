@@ -118,7 +118,7 @@ public class Server extends Thread {
                         temp.put("description", "please wait, game is currently running");
                     }
                 }
-                else if(jsonRecv.get("method").equals("ready")) {
+                else if(jsonRecv.get("method").equals("ready")) { 
                     temp.put("status","ok");
                     temp.put("description","waiting for other player to start");
                     send(clientSocket, temp);
@@ -255,9 +255,9 @@ public class Server extends Thread {
                         
                         for (int i = 0; i < players.size(); i++){
                             if (getAliveWerewolfNumber() == 0){
-                                gameOver("werewolf", client_socket.get(i));
-                            } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
                                 gameOver("civilian", client_socket.get(i));
+                            } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
+                                gameOver("werewolf", client_socket.get(i));
                             } else {
                                 changePhase("day", client_socket.get(i));
                             }
@@ -274,7 +274,7 @@ public class Server extends Thread {
                         send(clientSocket, temp);
                     } else {
                         temp.put("status", "ok");
-                        temp.put("description", "vote result for civilian recieved");
+                        temp.put("description", "vote result for civilian received");
                         send(clientSocket, temp);
                         
                         int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
@@ -282,9 +282,9 @@ public class Server extends Thread {
                         
                         for (int i = 0; i < players.size(); i++){
                             if (getAliveWerewolfNumber() == 0){
-                                gameOver("werewolf", client_socket.get(i));
-                            } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
                                 gameOver("civilian", client_socket.get(i));
+                            } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
+                                gameOver("werewolf", client_socket.get(i));
                             } else {
                                 changePhase("night", client_socket.get(i));
                             }
@@ -295,7 +295,7 @@ public class Server extends Thread {
                         temp.put("status", "fail");
                         temp.put("description", "the game hasn't started yet");
                         send(clientSocket, temp);
-                    } else if (Integer.parseInt(jsonRecv.get("vote_status").toString()) == 1) {
+                    } else if (Integer.parseInt(jsonRecv.get("vote_status").toString()) == -1) {
                         temp.put("status", "fail");
                         temp.put("description", "wrong method");
                         send(clientSocket, temp);
@@ -311,9 +311,9 @@ public class Server extends Thread {
                                     voteNow("day", client_socket.get(i));
                                 } else {
                                     if (getAliveWerewolfNumber() == 0){
-                                        gameOver("werewolf", client_socket.get(i));
-                                    } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
                                         gameOver("civilian", client_socket.get(i));
+                                    } else if (getAliveCivilianNumber() == getAliveWerewolfNumber()) {
+                                        gameOver("werewolf", client_socket.get(i));
                                     } else {
                                         changePhase("night", client_socket.get(i));
                                     }
