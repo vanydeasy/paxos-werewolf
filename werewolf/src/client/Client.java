@@ -715,8 +715,15 @@ public class Client implements Runnable {
                         System.out.print("Who will you kill? ");
                     }
                     voted_player = keyboard.nextLine();
-                    if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) break;
-                    System.out.println(voted_player+" already died. Choose another player!");
+                    
+                    if (this.getIDFromUsername(voted_player) != -1){    
+                        if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) 
+                            break;
+                        else
+                            System.out.println(voted_player+" already died. Choose another player!");
+                    } else {
+                        System.out.println(voted_player+" doesn't exist");
+                    }
                 }
                 this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
             }
