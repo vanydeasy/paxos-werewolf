@@ -221,7 +221,7 @@ public class Server extends Thread {
                         
                         Object recv_status_kpu = listen(clientSocket);
                         jsonRecv = (JSONObject)recv_status_kpu;
-                        if(jsonRecv.get("status").equals("ok")) { // success
+                        if(jsonRecv.get("status").equals("ok") && kpu_id !=-1) { // success
                             voteNow("day", clientSocket);
                             
                             Object recv_status_vote = listen(clientSocket);
@@ -353,7 +353,7 @@ public class Server extends Thread {
             InputStream iStream = socket.getInputStream();
             ObjectInputStream oiStream = new ObjectInputStream(iStream);
             object = (Object) oiStream.readObject();
-            System.out.println("\nServer received: "+object.toString()+" from: "+socket);
+            System.out.println("Server received: "+object.toString()+" from: "+socket);
         } catch (IOException | ClassNotFoundException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -372,7 +372,7 @@ public class Server extends Thread {
             System.out.println("Client "+socket+" has disconnected");
             return false;
         }
-        System.out.println("\nServer send: "+object.toString());
+        System.out.println("Server send: "+object.toString());
         return true;
     }
         
