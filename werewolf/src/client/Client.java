@@ -430,8 +430,8 @@ public class Client implements Runnable {
         if(this.player.isProposer()) size = this.getAlivePlayers();
         else size = 2;
         
-        int vote_civilian = 0, vote_werewolf = 0;
-        for(int i = 0; i < size; i++) {
+        int vote_civilian = 0, vote_werewolf = 0, prepare = 0, accept = 0;
+        while(true) {
             System.out.println("VOTE CIVILIAN "+vote_civilian+" VOTE WEREWOLF "+vote_werewolf);
             String recv = null;
             try {
@@ -458,6 +458,9 @@ public class Client implements Runnable {
                     int proposal_id = Integer.parseInt(prop.substring(prop.indexOf('(')+1, prop.indexOf(',')));
                     int player_id = Integer.parseInt(prop.substring(prop.indexOf(',')+1, prop.indexOf(')')));
                     this.sendToUDP(this.getPlayerAddress(player_id), this.getPlayerPort(player_id), sendData, this.lowerBound);
+                    if(this.player.isProposer() && prepare == 4) break;
+                    else if(!this.player.isProposer() && prepare == 1) break;
+                    prepare++;
                 } else if (jsonRecv.get("method").equals("accept_proposal")) {
                     if(++num_proposal <= 2) {
                         System.out.println("ACCEPT PROPOSAL "+num_proposal);
@@ -465,6 +468,9 @@ public class Client implements Runnable {
                         if(num_proposal == 1 && this.player.isProposer()) break;
                         else if(num_proposal == 2 && !this.player.isProposer()) break;
                     }
+                    if(this.player.isProposer() && accept == 4) break;
+                    else if(!this.player.isProposer() && accept == 1) break;
+                    accept++;
                 }
                 else if(jsonRecv.get("method").equals("vote_civilian")) {
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
@@ -472,7 +478,6 @@ public class Client implements Runnable {
                     vote_civilian++;
                 }
                 else if(jsonRecv.get("method").equals("vote_werewolf")) {
-                    System.out.println("DEAD WEREWOLF: "+ i + " " + this.getDeadWerewolf());
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
                     if(this.player.getRole().equals("werewolf")) {
                         if(1-this.getDeadWerewolf() == vote_werewolf +1) break;
@@ -765,7 +770,7 @@ public class Client implements Runnable {
             
             Thread t1 = new Thread(this);
             try {
-                this.udpSocket.setSoTimeout(20000);
+                this.udpSocket.setSoTimeout(60000);
             } catch (SocketException ex) {
                 Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
             }

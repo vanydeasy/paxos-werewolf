@@ -295,7 +295,7 @@ public class Server extends Thread {
                         temp.put("status", "fail");
                         temp.put("description", "the game hasn't started yet");
                         send(clientSocket, temp);
-                    } else if (Integer.parseInt(jsonRecv.get("vote_status").toString()) == -1) {
+                    } else if (Integer.parseInt(jsonRecv.get("vote_status").toString()) != -1) {
                         temp.put("status", "fail");
                         temp.put("description", "wrong method");
                         send(clientSocket, temp);
