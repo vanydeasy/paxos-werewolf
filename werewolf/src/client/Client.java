@@ -432,6 +432,7 @@ public class Client implements Runnable {
         
         int vote_civilian = 0, vote_werewolf = 0;
         for(int i = 0; i < size; i++) {
+            System.out.println("VOTE CIVILIAN "+vote_civilian+" VOTE WEREWOLF "+vote_werewolf);
             String recv = null;
             try {
                 recv = listenToUDP();
@@ -467,16 +468,19 @@ public class Client implements Runnable {
                 }
                 else if(jsonRecv.get("method").equals("vote_civilian")) {
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
-                    if(this.getAlivePlayers()-2 == vote_civilian++) break;
+                    if(this.getAlivePlayers()-2 == vote_civilian) break;
+                    vote_civilian++;
                 }
                 else if(jsonRecv.get("method").equals("vote_werewolf")) {
                     System.out.println("DEAD WEREWOLF: "+ i + " " + this.getDeadWerewolf());
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
                     if(this.player.getRole().equals("werewolf")) {
-                        if(1-this.getDeadWerewolf() == vote_werewolf++ +1) break;
+                        if(1-this.getDeadWerewolf() == vote_werewolf +1) break;
+                        vote_werewolf++;
                     }
                     else {
-                        if(2-this.getDeadWerewolf() == vote_werewolf++ +1) break;
+                        if(2-this.getDeadWerewolf() == vote_werewolf +1) break;
+                        vote_werewolf++;
                     }
                 }
             }
