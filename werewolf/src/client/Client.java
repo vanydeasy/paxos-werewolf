@@ -256,7 +256,7 @@ public class Client implements Runnable {
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             udpSocket.receive(receivePacket);
             String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
-            System.out.println("Received from UDP: "+sentence);
+            System.out.println("Received from UDP " + receivePacket.getAddress() + " " + receivePacket.getPort() +": "+sentence);
             return sentence;
         } catch (IOException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
@@ -758,13 +758,15 @@ public class Client implements Runnable {
 
         if(this.player.getKPUID() == this.player.getID()) {
             System.out.println("I AM THE KPU FOR TODAY");
+            
             Thread t1 = new Thread(this);
             try {
-                this.udpSocket.setSoTimeout(0);
+                this.udpSocket.setSoTimeout(20000);
             } catch (SocketException ex) {
                 Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
             }
             t1.start();
+            
             String voted_player;
             if(isDay && this.player.isAlive()) {
                 while(true) {
@@ -885,7 +887,11 @@ public class Client implements Runnable {
                 System.out.println("You already died. Just watch!");
             }
         }
-            
+        try {
+            this.udpSocket.setSoTimeout(0);
+        } catch (SocketException ex) {
+            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
     
     
