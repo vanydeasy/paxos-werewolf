@@ -17,6 +17,7 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +50,10 @@ public class Client implements Runnable {
     private int day = 0; // number of days
     
     private List<Integer> votes = new ArrayList<>();
+    
+    private List<String> proposal = new ArrayList<>();
+            
+    private static int timeout = 10000;
     
     public Client() {
         SERVER_HOSTNAME = "127.0.0.1";
@@ -100,6 +105,13 @@ public class Client implements Runnable {
                     String sendData = sent.toJSONString();
 
                     Thread t1 = new Thread(client);
+                    
+                    try {
+                        client.udpSocket.setSoTimeout(timeout);
+                    } catch (SocketException ex) {
+                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    
                     t1.start();
 
                     for(int i=0;i<Client.players.size();i++) {
@@ -115,8 +127,15 @@ public class Client implements Runnable {
                     } catch (InterruptedException ex) {
                         Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                     }
-
+                    
                     Thread t2 = new Thread(client);
+                    
+                    try {
+                        client.udpSocket.setSoTimeout(timeout);
+                    } catch (SocketException ex) {
+                        Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    
                     t2.start();
 
                     sent.clear();
@@ -204,8 +223,7 @@ public class Client implements Runnable {
         return object;
     }
     
-    public String listenToUDP() {
-        // System.out.println("Listen on port "+player.getUDPPort());
+    public String listenToUDP() throws SocketTimeoutException {
         try {
             byte[] receiveData = new byte[1024];
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
@@ -237,7 +255,7 @@ public class Client implements Runnable {
         try {
             UnreliableSender unreliableSender = new UnreliableSender(udpSocket);
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress), port);
-            unreliableSender.send(sendPacket, 1.00);
+            unreliableSender.send(sendPacket, 0.2);
         } catch (SocketException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -387,139 +405,146 @@ public class Client implements Runnable {
         
         for(int i = 0; i < size; i++) {
             JSONObject proposal_1 = null;
-            String recv = listenToUDP();
-
-            JSONParser parser = new JSONParser();
-            JSONObject jsonRecv = new JSONObject();
             try {
-                jsonRecv = (JSONObject) parser.parse(recv);
-            } catch (ParseException ex) {
-                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-            }
+                String recv = listenToUDP();
+                JSONParser parser = new JSONParser();
+                JSONObject jsonRecv = new JSONObject();
+                try {
+                    jsonRecv = (JSONObject) parser.parse(recv);
+                } catch (ParseException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                JSONObject data = new JSONObject();
+                if(jsonRecv.get("method") != null) {
+                    if(jsonRecv.get("method").equals("prepare_proposal")){
+                        data.put("status", "ok");
+                        data.put("description", "accepted");
+                        data.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
+                        String sendData = data.toJSONString();
+                        String prop = (String)jsonRecv.get("proposal_id");
+                        int proposal_id = Integer.parseInt(prop.substring(prop.indexOf('(')+1, prop.indexOf(',')));
+                        int player_id = Integer.parseInt(prop.substring(prop.indexOf(',')+1, prop.indexOf(')')));
+                        this.sendToUDP(this.getPlayerAddress(player_id), this.getPlayerPort(player_id), sendData);
+                    } else if (jsonRecv.get("method").equals("accept_proposal")) {
+                        if(++num_proposal <= 2) {
+                            System.out.println("ACCEPT PROPOSAL "+num_proposal);
 
-            JSONObject data = new JSONObject();
-            if(jsonRecv.get("method") != null) {
-                if(jsonRecv.get("method").equals("prepare_proposal")){
-                    data.put("status", "ok");
-                    data.put("description", "accepted");
-                    data.put("previous_accepted", this.player.getKPUID()); // gue ga ngerti previous kpu_id maksudnya apa
-                    String sendData = data.toJSONString();
-                    String prop = (String)jsonRecv.get("proposal_id");
-                    int proposal_id = Integer.parseInt(prop.substring(prop.indexOf('(')+1, prop.indexOf(',')));
-                    int player_id = Integer.parseInt(prop.substring(prop.indexOf(',')+1, prop.indexOf(')')));
-                    this.sendToUDP(this.getPlayerAddress(player_id), this.getPlayerPort(player_id), sendData);
-                } else if (jsonRecv.get("method").equals("accept_proposal")) {
-                    if(num_proposal < 2) {
-                        num_proposal++;
-                        System.out.println("ACCEPT PROPOSAL "+num_proposal);
-                        
-                        if(num_proposal == 2 && !this.player.isProposer()) {
-                            try {
-                                proposal_1 = (JSONObject)parser.parse(str_prop_1);
-                            } catch (ParseException ex) {
-                                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                            String prop_1 = (String)proposal_1.get("proposal_id");
-                            String prop_2 = (String)jsonRecv.get("proposal_id");
-
-                            int proposal_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf('(')+1, prop_1.indexOf(',')));
-                            int proposal_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf('(')+1, prop_2.indexOf(',')));
-                            int player_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf(',')+1, prop_1.indexOf(')')));
-                            int player_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf(',')+1, prop_2.indexOf(')')));
-                            
-                            int player_won, player_lose;
-                            if(proposal_id_1 > proposal_id_2) {
-                                player_won = player_id_1;
-                                player_lose = player_id_2;
-                            }
-                            else if(proposal_id_1 < proposal_id_2) {
-                                player_won = player_id_2;
-                                player_lose = player_id_1;
-                            }
-                            else { //proposal_id_1 == proposal_id_2
-                                if(player_id_1 < player_id_2) {
-                                    player_won = player_id_2;
-                                    player_lose = player_id_1;
+                            if(num_proposal == 2 && !this.player.isProposer()) {
+                                try {
+                                    proposal_1 = (JSONObject)parser.parse(str_prop_1);
+                                } catch (ParseException ex) {
+                                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                                 }
-                                else {
+                                String prop_1 = (String)proposal_1.get("proposal_id");
+                                String prop_2 = (String)jsonRecv.get("proposal_id");
+
+                                int proposal_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf('(')+1, prop_1.indexOf(',')));
+                                int proposal_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf('(')+1, prop_2.indexOf(',')));
+                                int player_id_1 = Integer.parseInt(prop_1.substring(prop_1.indexOf(',')+1, prop_1.indexOf(')')));
+                                int player_id_2 = Integer.parseInt(prop_2.substring(prop_2.indexOf(',')+1, prop_2.indexOf(')')));
+
+                                int player_won, player_lose;
+                                if(proposal_id_1 > proposal_id_2) {
                                     player_won = player_id_1;
                                     player_lose = player_id_2;
                                 }
-                            }
-                            
-                            data.put("status", "ok");
-                            data.put("description", "accepted");
-                            String sendData = data.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(player_won), this.getPlayerPort(player_won), sendData);
-                            data.clear();
-                            data.put("status", "fail");
-                            data.put("description", "rejected");
-                            sendData = data.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(player_lose), this.getPlayerPort(player_lose), sendData);
+                                else if(proposal_id_1 < proposal_id_2) {
+                                    player_won = player_id_2;
+                                    player_lose = player_id_1;
+                                }
+                                else { //proposal_id_1 == proposal_id_2
+                                    if(player_id_1 < player_id_2) {
+                                        player_won = player_id_2;
+                                        player_lose = player_id_1;
+                                    }
+                                    else {
+                                        player_won = player_id_1;
+                                        player_lose = player_id_2;
+                                    }
+                                }
 
-                            data.clear();
-                            data.put("method","accepted_proposal");
-                            data.put("kpu_id", player_won);
-                            data.put("description","kpu is selected");
-                            this.sendToServer(data);
-                            
-                            proposal_1 = null;
-                            
-                            JSONObject status = (JSONObject)this.listenToServer();
-                            if(status.get("status").equals("ok")) {
-                                JSONObject kpu = (JSONObject)this.listenToServer();
-                                if(kpu.get("kpu_id") != null) {
-                                    this.player.setKPU(Integer.parseInt(kpu.get("kpu_id").toString()));
-                                }
+                                data.put("status", "ok");
+                                data.put("description", "accepted");
+                                String sendData = data.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_won), this.getPlayerPort(player_won), sendData);
                                 data.clear();
-                                data.put("status","ok");
+                                data.put("status", "fail");
+                                data.put("description", "rejected");
+                                sendData = data.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(player_lose), this.getPlayerPort(player_lose), sendData);
+
+                                data.clear();
+                                data.put("method","accepted_proposal");
+                                data.put("kpu_id", player_won);
+                                data.put("description","kpu is selected");
                                 this.sendToServer(data);
+
+                                proposal_1 = null;
+
+                                JSONObject status = (JSONObject)this.listenToServer();
+                                if(status.get("status").equals("ok")) {
+                                    JSONObject kpu = (JSONObject)this.listenToServer();
+                                    if(kpu.get("kpu_id") != null) {
+                                        this.player.setKPU(Integer.parseInt(kpu.get("kpu_id").toString()));
+                                    }
+                                    data.clear();
+                                    data.put("status","ok");
+                                    this.sendToServer(data);
+                                }
+                            }
+                            else if(num_proposal == 1 && !this.player.isProposer()) {
+                                str_prop_1 = jsonRecv.toJSONString();
+                            }
+                            else if(num_proposal == 1 && this.player.isProposer()) {
+                                String proposal = (String)jsonRecv.get("proposal_id");
+                                int proposal_id = Integer.parseInt(proposal.substring(proposal.indexOf(',')+1, proposal.indexOf(')')));
+                                data.put("status", "fail");
+                                data.put("description", "rejected");
+                                String sendData = data.toJSONString();
+                                this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
+
+                                data.clear();
+                                data.put("method","accepted_proposal");
+                                data.put("kpu_id", this.player.getID());
+                                data.put("description","kpu is selected");
+                                this.sendToServer(data);
+
+                                JSONObject status = (JSONObject)this.listenToServer();
+                                if(status.get("status").equals("ok")) {
+                                    JSONObject kpu = (JSONObject)this.listenToServer();
+                                    if(kpu.get("kpu_id") != null) {
+                                        this.player.setKPU(Integer.parseInt(kpu.get("kpu_id").toString()));
+                                    }
+                                    data.clear();
+                                    data.put("status","ok");
+                                    this.sendToServer(data);
+                                }
                             }
                         }
-                        else if(num_proposal == 1 && !this.player.isProposer()) {
-                            str_prop_1 = jsonRecv.toJSONString();
+                    }
+                    else if(jsonRecv.get("method").equals("vote_civilian")) {
+                        this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
+                        if(this.getAlivePlayers()-2 == i) break;
+                    }
+                    else if(jsonRecv.get("method").equals("vote_werewolf")) {
+                        this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
+                        if(this.player.getRole().equals("werewolf")) {
+                            if(1-this.getDeadWerewolf() == i+1) break;
                         }
-                        else if(num_proposal == 1 && this.player.isProposer()) {
-                            String proposal = (String)jsonRecv.get("proposal_id");
-                            int proposal_id = Integer.parseInt(proposal.substring(proposal.indexOf(',')+1, proposal.indexOf(')')));
-                            data.put("status", "fail");
-                            data.put("description", "rejected");
-                            String sendData = data.toJSONString();
-                            this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
-                            
-                            data.clear();
-                            data.put("method","accepted_proposal");
-                            data.put("kpu_id", this.player.getID());
-                            data.put("description","kpu is selected");
-                            this.sendToServer(data);
-                            
-                            JSONObject status = (JSONObject)this.listenToServer();
-                            if(status.get("status").equals("ok")) {
-                                JSONObject kpu = (JSONObject)this.listenToServer();
-                                if(kpu.get("kpu_id") != null) {
-                                    this.player.setKPU(Integer.parseInt(kpu.get("kpu_id").toString()));
-                                }
-                                data.clear();
-                                data.put("status","ok");
-                                this.sendToServer(data);
-                            }
+                        else {
+                            if(2-this.getDeadWerewolf() == i+1) break;
                         }
                     }
                 }
-                else if(jsonRecv.get("method").equals("vote_civilian")) {
-                    this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
-                    if(this.getAlivePlayers()-2 == i) break;
-                }
-                else if(jsonRecv.get("method").equals("vote_werewolf")) {
-                    this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
-                    if(this.player.getRole().equals("werewolf")) {
-                        if(1-this.getDeadWerewolf() == i+1) break;
-                    }
-                    else {
-                        if(2-this.getDeadWerewolf() == i+1) break;
-                    }
-                }
+            } catch (SocketTimeoutException e) {
+                System.out.println("Time out reached!");
+                break;
             }
+        }
+        try {
+            this.udpSocket.setSoTimeout(0);
+        } catch (SocketException ex) {
+            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
