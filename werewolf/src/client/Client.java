@@ -430,7 +430,7 @@ public class Client implements Runnable {
         if(this.player.isProposer()) size = this.getAlivePlayers();
         else size = 2;
         
-        int vote = 0;
+        int vote_civilian = 0, vote_werewolf = 0;
         for(int i = 0; i < size; i++) {
             String recv = null;
             try {
@@ -467,16 +467,16 @@ public class Client implements Runnable {
                 }
                 else if(jsonRecv.get("method").equals("vote_civilian")) {
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
-                    if(this.getAlivePlayers()-2 == vote++) break;
+                    if(this.getAlivePlayers()-2 == vote_civilian++) break;
                 }
                 else if(jsonRecv.get("method").equals("vote_werewolf")) {
                     System.out.println("DEAD WEREWOLF: "+ i + " " + this.getDeadWerewolf());
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
                     if(this.player.getRole().equals("werewolf")) {
-                        if(1-this.getDeadWerewolf() == i+1) break;
+                        if(1-this.getDeadWerewolf() == vote_werewolf++ +1) break;
                     }
                     else {
-                        if(2-this.getDeadWerewolf() == i+1) break;
+                        if(2-this.getDeadWerewolf() == vote_werewolf++ +1) break;
                     }
                 }
             }
