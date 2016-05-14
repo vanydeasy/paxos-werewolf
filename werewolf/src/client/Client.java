@@ -55,6 +55,8 @@ public class Client implements Runnable {
             
     private static int timeout = 10000;
     
+    private static double lowerBound = 0.85;
+    
     public Client() {
         SERVER_HOSTNAME = "127.0.0.1";
         COMM_PORT = 8181;
@@ -120,7 +122,7 @@ public class Client implements Runnable {
                                 String ipAddress = ((JSONObject)Client.players.get(i)).get("address").toString();
                                 int port = Integer.parseInt(((JSONObject)Client.players.get(i)).get("port").toString());
                                 if ( port != client.player.getUDPPort()){
-                                    client.sendToUDP(ipAddress, port, sendData);
+                                    client.sendToUDP(ipAddress, port, sendData, client.lowerBound);
                                 }
                             }
 
@@ -145,7 +147,7 @@ public class Client implements Runnable {
                                 String ipAddress = ((JSONObject)Client.players.get(i)).get("address").toString();
                                 int port = Integer.parseInt(((JSONObject)Client.players.get(i)).get("port").toString());
                                 if ( port != client.player.getUDPPort()){
-                                    client.sendToUDP(ipAddress, port, sendData);
+                                    client.sendToUDP(ipAddress, port, sendData, client.lowerBound);
                                 }
                             }
 
@@ -274,13 +276,13 @@ public class Client implements Runnable {
         }
     }
     
-    public void sendToUDP(String ipAddress, int port, String send) {
+    public void sendToUDP(String ipAddress, int port, String send, double bound) {
         System.out.println("Send to "+ipAddress+"|"+port+": "+send);
         byte[] sendData = send.getBytes();
         try {
             UnreliableSender unreliableSender = new UnreliableSender(udpSocket);
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress), port);
-            unreliableSender.send(sendPacket, 0.85);
+            unreliableSender.send(sendPacket, bound);
         } catch (SocketException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -428,6 +430,7 @@ public class Client implements Runnable {
         if(this.player.isProposer()) size = this.getAlivePlayers();
         else size = 2;
         
+        int vote = 0;
         for(int i = 0; i < size; i++) {
             String recv = null;
             try {
@@ -453,7 +456,7 @@ public class Client implements Runnable {
                     String prop = (String)jsonRecv.get("proposal_id");
                     int proposal_id = Integer.parseInt(prop.substring(prop.indexOf('(')+1, prop.indexOf(',')));
                     int player_id = Integer.parseInt(prop.substring(prop.indexOf(',')+1, prop.indexOf(')')));
-                    this.sendToUDP(this.getPlayerAddress(player_id), this.getPlayerPort(player_id), sendData);
+                    this.sendToUDP(this.getPlayerAddress(player_id), this.getPlayerPort(player_id), sendData, this.lowerBound);
                 } else if (jsonRecv.get("method").equals("accept_proposal")) {
                     if(++num_proposal <= 2) {
                         System.out.println("ACCEPT PROPOSAL "+num_proposal);
@@ -464,9 +467,10 @@ public class Client implements Runnable {
                 }
                 else if(jsonRecv.get("method").equals("vote_civilian")) {
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
-                    if(this.getAlivePlayers()-2 == i) break;
+                    if(this.getAlivePlayers()-2 == vote++) break;
                 }
                 else if(jsonRecv.get("method").equals("vote_werewolf")) {
+                    System.out.println("DEAD WEREWOLF: "+ i + " " + this.getDeadWerewolf());
                     this.votes.set(Integer.parseInt(jsonRecv.get("player_id").toString()), votes.get(Integer.parseInt(jsonRecv.get("player_id").toString()))+1);
                     if(this.player.getRole().equals("werewolf")) {
                         if(1-this.getDeadWerewolf() == i+1) break;
@@ -555,7 +559,7 @@ public class Client implements Runnable {
                 data.put("status", "ok");
                 data.put("description", "accepted");
                 String sendData = data.toJSONString();
-                this.sendToUDP(this.getPlayerAddress(player_won), this.getPlayerPort(player_won), sendData);
+                this.sendToUDP(this.getPlayerAddress(player_won), this.getPlayerPort(player_won), sendData, this.lowerBound);
                 data.clear();
             }
             
@@ -563,7 +567,7 @@ public class Client implements Runnable {
                 data.put("status", "fail");
                 data.put("description", "rejected");
                 String sendData = data.toJSONString();
-                this.sendToUDP(this.getPlayerAddress(player_lose), this.getPlayerPort(player_lose), sendData);
+                this.sendToUDP(this.getPlayerAddress(player_lose), this.getPlayerPort(player_lose), sendData, this.lowerBound);
                 data.clear();
             }
             
@@ -592,7 +596,7 @@ public class Client implements Runnable {
                 data.put("status", "fail");
                 data.put("description", "rejected");
                 String sendData = data.toJSONString();
-                this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData);
+                this.sendToUDP(this.getPlayerAddress(proposal_id), this.getPlayerPort(proposal_id), sendData, this.lowerBound);
 
                 data.clear();
                 data.put("method","accepted_proposal");
@@ -840,7 +844,7 @@ public class Client implements Runnable {
                 }
                 data.put("method","vote_civilian");
                 data.put("player_id", this.getIDFromUsername(voted_player));
-                this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
+                this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString(), 1.00);
             }
             else if(!isDay && this.player.isAlive()) {
                 if(this.player.getRole().equals("civilian")) {
@@ -856,7 +860,7 @@ public class Client implements Runnable {
                     }
                     data.put("method","vote_werewolf");
                     data.put("player_id", this.getIDFromUsername(voted_player));
-                    this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString());
+                    this.sendToUDP(this.getPlayerAddress(this.player.getKPUID()), this.getPlayerPort(this.player.getKPUID()), data.toJSONString(), 1.00);
                 }
             }
             else if(!this.player.isAlive()) {
