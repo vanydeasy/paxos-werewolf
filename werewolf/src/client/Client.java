@@ -795,8 +795,14 @@ public class Client implements Runnable {
                     while(true) {
                         System.out.print("Which civilian you are going to kill? ");
                         voted_player = keyboard.nextLine();
-                        if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) break;
-                        System.out.println(voted_player+" already died. Choose another player!");
+                        if (this.getIDFromUsername(voted_player) != -1){    
+                            if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) 
+                                break;
+                            else
+                                System.out.println(voted_player+" already died. Choose another player!");
+                        } else {
+                            System.out.println(voted_player+" doesn't exist");
+                        }
                     }
                     this.votes.set(this.getIDFromUsername(voted_player), votes.get(this.getIDFromUsername(voted_player))+1);
                 }
@@ -839,8 +845,14 @@ public class Client implements Runnable {
                         System.out.print("Who will you kill? ");
                     }
                     voted_player = keyboard.nextLine();
-                    if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) break;
-                    System.out.println(voted_player+" already died. Choose another player!");
+                    if (this.getIDFromUsername(voted_player) != -1){    
+                        if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) 
+                            break;
+                        else
+                            System.out.println(voted_player+" already died. Choose another player!");
+                    } else {
+                        System.out.println(voted_player+" doesn't exist");
+                    }
                 }
                 data.put("method","vote_civilian");
                 data.put("player_id", this.getIDFromUsername(voted_player));
@@ -855,8 +867,14 @@ public class Client implements Runnable {
                     while(true) {
                         System.out.print("Who will you kill tonight? ");
                         voted_player = keyboard.nextLine();
-                        if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) break;
-                        System.out.println(voted_player+" already died. Choose another player!");
+                        if (this.getIDFromUsername(voted_player) != -1){    
+                            if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) 
+                                break;
+                            else
+                                System.out.println(voted_player+" already died. Choose another player!");
+                        } else {
+                            System.out.println(voted_player+" doesn't exist");
+                        }
                     }
                     data.put("method","vote_werewolf");
                     data.put("player_id", this.getIDFromUsername(voted_player));
