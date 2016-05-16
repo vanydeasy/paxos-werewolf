@@ -41,7 +41,10 @@ public class UnreliableSender
 
         if (rand < fault) {
             datagramSocket.send(packet);
-            System.out.println("Sending the package");
+            System.out.println("The package is sent!");
+        }
+        else {
+            System.out.println("The package is lost");
         }
     }
 

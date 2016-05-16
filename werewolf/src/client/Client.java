@@ -113,7 +113,7 @@ public class Client implements Runnable {
                             try {
                                 client.udpSocket.setSoTimeout(timeout);
                             } catch (SocketException ex) {
-                                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                                
                             }
 
                             t1.start();
@@ -133,7 +133,7 @@ public class Client implements Runnable {
                             try {
                                 client.udpSocket.setSoTimeout(timeout);
                             } catch (SocketException ex) {
-                                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                                
                             }
 
                             t2.start();
@@ -173,7 +173,7 @@ public class Client implements Runnable {
                             try {
                                 client.udpSocket.setSoTimeout(timeout);
                             } catch (SocketException ex) {
-                                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                                
                             }
 
                             t1.start();
@@ -184,7 +184,7 @@ public class Client implements Runnable {
                             try {
                                 client.udpSocket.setSoTimeout(timeout);
                             } catch (SocketException ex) {
-                                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                                
                             }
 
                             t2.start();
@@ -211,7 +211,10 @@ public class Client implements Runnable {
                         method = client.changePhase();
                     } while(method.get("method").equals("vote_now"));
 
-                    if(method.get("method").equals("game_over")) break;
+                    if(method.get("method").equals("game_over")) {
+                        System.out.println("GAME OVER!");
+                        break;
+                    }
                 }
             }
             
@@ -239,7 +242,7 @@ public class Client implements Runnable {
             ObjectInputStream oiStream = new ObjectInputStream(iStream);
             object = (Object) oiStream.readObject();
             if(object instanceof JSONObject) {
-                System.out.println("JSON received from server: "+((JSONObject) object).toJSONString());
+                System.out.println("Server :: Received "+((JSONObject) object).toJSONString());
             }
             else {
                 System.out.println("Unknown object received: "+object.toString());
@@ -256,35 +259,35 @@ public class Client implements Runnable {
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             udpSocket.receive(receivePacket);
             String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
-            System.out.println("Received from UDP " + receivePacket.getAddress() + " " + receivePacket.getPort() +": "+sentence);
+            System.out.println("UDP :: Received " + receivePacket.getAddress() + "|" + receivePacket.getPort() +" : "+sentence);
             return sentence;
         } catch (IOException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            
         }
         return null;
     }
     
     // Send object to server
     public void sendToServer(Object object) {
-        System.out.println("Send to server: "+object.toString());
         try {
             OutputStream oStream = socket.getOutputStream();
             ObjectOutputStream ooStream = new ObjectOutputStream(oStream);
             ooStream.writeObject(object);  // send seriliazed
+            System.out.println("Server :: Sent "+object.toString());
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
     public void sendToUDP(String ipAddress, int port, String send, double bound) {
-        System.out.println("Send to "+ipAddress+"|"+port+": "+send);
         byte[] sendData = send.getBytes();
         try {
             UnreliableSender unreliableSender = new UnreliableSender(udpSocket);
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(ipAddress), port);
             unreliableSender.send(sendPacket, bound);
+            System.out.println("UDP :: Sent "+ipAddress+"|"+port+" : "+send);
         } catch (SocketException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            
         }
         catch (IOException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
@@ -298,8 +301,11 @@ public class Client implements Runnable {
             do {
                 try {
                     Scanner keyboard = new Scanner(System.in);
-                    System.out.print("Username: ");
-                    username = keyboard.nextLine();
+                    do {
+                        System.out.print("Username: ");
+                        username = keyboard.nextLine();
+                        if(username.equals("")) System.out.println("You cannot have blank username");
+                    } while(username.equals(""));
                     System.out.print("UDP Port: ");
                     udp_port = keyboard.nextInt();
                     
@@ -320,7 +326,7 @@ public class Client implements Runnable {
             try {
                 udpSocket = new DatagramSocket(udp_port);
             } catch (SocketException ex) {
-                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                
             }
 
             // Mendapatkan player id dari server
@@ -328,21 +334,31 @@ public class Client implements Runnable {
             this.player = new Player(player_id, username, Inet4Address.getLocalHost().getHostAddress(), udp_port);
             obj.clear();
             
-            // Mengirim ready ke user
-            obj.put("method","ready");
-            player.setReady(true);
-            sendToServer(obj);
+            System.out.print("Ready to play?(Y/N) ");
+            Scanner keyboard = new Scanner(System.in);
+            String play_game = keyboard.nextLine();
             
-            // Mendapatkan status dari server = ok
-            obj = (JSONObject)listenToServer();
-            if(obj.get("status") != null) {
-                if(obj.get("status").equals("ok")) {
+            if(play_game.equalsIgnoreCase("Y")) {
+                // Mengirim ready ke user
+                obj.put("method","ready");
+                player.setReady(true);
+                sendToServer(obj);
+                // Mendapatkan status dari server = ok
+                obj = (JSONObject)listenToServer();
+                if(obj.get("status") != null) {
+                    if(obj.get("status").equals("ok")) {
+
+                    }
                 }
+            }
+            else {
+                System.out.println("Leaving the game...");
+                this.leaveGame();
+                System.exit(0);
             }
         } catch (UnknownHostException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
     }
     
     public void startGame() {
@@ -353,7 +369,7 @@ public class Client implements Runnable {
             System.out.println("YOUR ROLE IS " + player.getRole());
             if(recv.get("friends")!=null) {
                 friends = (ArrayList)recv.get("friends");
-                System.out.println("YOUR FRIENDS ARE ");
+                System.out.println("YOUR FRIEND IS ");
                 for(String friend : friends)
                     System.out.print(friend+" ");
                 System.out.println("");
@@ -362,7 +378,6 @@ public class Client implements Runnable {
             obj.put("status","ok");
             sendToServer(obj);
         }
-        
         day++;
         isDay = true;
     }
@@ -379,7 +394,7 @@ public class Client implements Runnable {
         }
         else if(recv.get("method").equals("game_over")) {
             System.out.println("THE GAME IS OVER");
-            
+            System.out.println("The winner is "+recv.get("winner"));
             JSONObject obj = new JSONObject();
             obj.put("status","ok");
             sendToServer(obj);
@@ -432,7 +447,6 @@ public class Client implements Runnable {
         
         int vote_civilian = 0, vote_werewolf = 0, prepare = 0, accept = 0;
         while(true) {
-            System.out.println("VOTE CIVILIAN "+vote_civilian+" VOTE WEREWOLF "+vote_werewolf);
             String recv = null;
             try {
                 recv = listenToUDP();
@@ -463,7 +477,6 @@ public class Client implements Runnable {
                     prepare++;
                 } else if (jsonRecv.get("method").equals("accept_proposal")) {
                     if(++num_proposal <= 2) {
-                        System.out.println("ACCEPT PROPOSAL "+num_proposal);
                         proposal.add(jsonRecv);
                         if(num_proposal == 1 && this.player.isProposer()) break;
                         else if(num_proposal == 2 && !this.player.isProposer()) break;
@@ -493,7 +506,7 @@ public class Client implements Runnable {
         try {
             this.udpSocket.setSoTimeout(0);
         } catch (SocketException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            
         }
     }
     
@@ -764,6 +777,14 @@ public class Client implements Runnable {
         data.put("status", "ok");
         this.sendToServer(data);
         data.clear();
+        
+        // List of players
+        System.out.println("Players");
+        for(Object player : players) {
+            JSONObject temp = (JSONObject)player;
+            System.out.print(temp.get("username")+"\t\t");
+            System.out.println(temp.get("is_alive").equals(1) ? "ALIVE" : "DEAD");
+        }
 
         if(this.player.getKPUID() == this.player.getID()) {
             System.out.println("I AM THE KPU FOR TODAY");
@@ -772,7 +793,7 @@ public class Client implements Runnable {
             try {
                 this.udpSocket.setSoTimeout(60000);
             } catch (SocketException ex) {
-                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                
             }
             t1.start();
             
@@ -780,10 +801,11 @@ public class Client implements Runnable {
             if(isDay && this.player.isAlive()) {
                 while(true) {
                     if(this.player.getRole().equals("civilian")) {
-                        System.out.print("Who is the werewolf? ");
+                        System.out.print("\nWHO IS THE WEREWOLF? ");
                     }
                     else {
-                        System.out.print("Who will you kill? ");
+                        System.out.println("\nDO NOT FORGET! YOUR FRIEND IS "+friends.get(0));
+                        System.out.print("AS THE WEREWOLF, WHO WILL YOU KILL? ");
                     }
                     voted_player = keyboard.nextLine();
                     
@@ -804,7 +826,7 @@ public class Client implements Runnable {
                 }
                 else {
                     while(true) {
-                        System.out.print("Which civilian you are going to kill? ");
+                        System.out.print("\nWHO WILL YOU KILL TONIGHT? ");
                         voted_player = keyboard.nextLine();
                         if (this.getIDFromUsername(voted_player) != -1){    
                             if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) 
@@ -819,7 +841,7 @@ public class Client implements Runnable {
                 }
             }
             else if(!this.player.isAlive()) {
-                System.out.println("You already died. Just watch!");
+                System.out.println("\nYou already died. Just watch!");
             }
 
             try {
@@ -850,10 +872,11 @@ public class Client implements Runnable {
                 String voted_player = null;
                 while(true) {
                     if(this.player.getRole().equals("civilian")) {
-                        System.out.print("Who is the werewolf? ");
+                        System.out.print("\nWHO IS THE WEREWOLF? ");
                     }
                     else {
-                        System.out.print("Who will you kill? ");
+                        System.out.println("\nDO NOT FORGET! YOUR FRIEND IS "+friends.get(0));
+                        System.out.print("AS THE WEREWOLF, WHO WILL YOU KILL? ");
                     }
                     voted_player = keyboard.nextLine();
                     if (this.getIDFromUsername(voted_player) != -1){    
@@ -876,7 +899,7 @@ public class Client implements Runnable {
                 else {
                     String voted_player = null;
                     while(true) {
-                        System.out.print("Who will you kill tonight? ");
+                        System.out.print("\nWHO WILL YOU KILL TONIGHT? ");
                         voted_player = keyboard.nextLine();
                         if (this.getIDFromUsername(voted_player) != -1){    
                             if(this.isPlayerAlive(this.getIDFromUsername(voted_player))) 
@@ -899,7 +922,7 @@ public class Client implements Runnable {
         try {
             this.udpSocket.setSoTimeout(0);
         } catch (SocketException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            
         }
     }
     

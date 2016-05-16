@@ -5,16 +5,15 @@
  */
 package server;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -79,15 +78,19 @@ public class Server extends Thread {
 
     @Override
     public void run() {
-        System.out.println ("New Communication Thread Started");
         JSONObject jsonRecv;
         boolean isLeave = false;
         
         // Listening
         do {
             JSONObject temp = new JSONObject();
-                        
+            
             Object recv = listen(clientSocket);
+            
+            if(recv instanceof Boolean) {
+                if(!((Boolean) recv)) break;
+            }
+            
             jsonRecv = (JSONObject)recv;
             temp.clear();
             String method = (String)jsonRecv.get("method");
@@ -151,12 +154,23 @@ public class Server extends Thread {
                         send(clientSocket, temp);
 
                         Object recv_status_start = listen(clientSocket);
+                        
+                        if(recv_status_start instanceof Boolean) {
+                            if(!((Boolean) recv_status_start)) break;
+                        }
+                        
                         jsonRecv = (JSONObject)recv_status_start;
                         if(jsonRecv.get("status").equals("ok")) { // successfully start the game
                             // CHANGE PHASE
                             changePhase("day", clientSocket);
-                            JSONObject status = (JSONObject)listen(clientSocket);
-                            if(status.get("status").equals("ok")) { 
+                            Object status = (JSONObject)listen(clientSocket);
+                            
+                            if(status instanceof Boolean) {
+                                if(!((Boolean) status)) break;
+                            }
+                            
+                            JSONObject jsonStatus = (JSONObject)status;
+                            if(jsonStatus.get("status").equals("ok")) { 
                                 // success
                             }
                         } else {
@@ -181,6 +195,11 @@ public class Server extends Thread {
                         voteNow("night", clientSocket);
                         
                         Object recv_status_phase = listen(clientSocket);
+                        
+                        if(recv_status_phase instanceof Boolean) {
+                            if(!((Boolean) recv_status_phase)) break;
+                        }
+                        
                         jsonRecv = (JSONObject)recv_status_phase;
                         if(jsonRecv.get("status").equals("ok")) { 
                             // success
@@ -220,11 +239,21 @@ public class Server extends Thread {
                         send(clientSocket, temp);
                         
                         Object recv_status_kpu = listen(clientSocket);
+                        
+                        if(recv_status_kpu instanceof Boolean) {
+                            if(!((Boolean) recv_status_kpu)) break;
+                        }
+                        
                         jsonRecv = (JSONObject)recv_status_kpu;
                         if(jsonRecv.get("status").equals("ok") && kpu_id !=-1) { // success
                             voteNow("day", clientSocket);
                             
                             Object recv_status_vote = listen(clientSocket);
+                            
+                            if(recv_status_vote instanceof Boolean) {
+                                if(!((Boolean) recv_status_vote)) break;
+                            }
+                            
                             jsonRecv = (JSONObject)recv_status_vote;
                             if(jsonRecv.get("status").equals("ok")) { 
                                 // success
@@ -335,16 +364,16 @@ public class Server extends Thread {
             }
         } while(!isLeave);
         
-        JSONObject leave = new JSONObject();
-        leave.put("status", "ok");
-        send(clientSocket, leave);
+        if(isLeave) {
+            JSONObject leave = new JSONObject();
+            leave.put("status", "ok");
+            send(clientSocket, leave);
+
+            System.out.println("Client Counter: "+ --client_count);
+            --player_count;
+        }
         
-        players.stream().filter((p) -> ((Integer)p.get("player_id") == player_count)).forEach((p) -> {
-            p = null;
-        });
         System.out.println("\nCommunication Thread Stopped. Client leave!");
-        System.out.println("Client Counter: "+ --client_count);
-        --player_count;
     }
     
     public static Object listen(Socket socket) {
@@ -353,9 +382,12 @@ public class Server extends Thread {
             InputStream iStream = socket.getInputStream();
             ObjectInputStream oiStream = new ObjectInputStream(iStream);
             object = (Object) oiStream.readObject();
-            System.out.println("Server received: "+object.toString()+" from: "+socket);
-        } catch (IOException | ClassNotFoundException ex) {
+            System.out.println("Received ("+socket.getPort()+") :: "+object.toString());
+        } catch (ClassNotFoundException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            System.out.println("Client has disconnected!");
+            return false;
         }
         return object;
     }
@@ -372,7 +404,7 @@ public class Server extends Thread {
             System.out.println("Client "+socket+" has disconnected");
             return false;
         }
-        System.out.println("Server send: "+object.toString());
+        System.out.println("Sent ("+socket.getPort()+") :: "+object.toString());
         return true;
     }
         
