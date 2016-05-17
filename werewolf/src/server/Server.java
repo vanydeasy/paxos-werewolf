@@ -45,6 +45,7 @@ public class Server extends Thread {
     private int day_vote = 0; // number of voting time
     private static boolean isDay = false;
     private boolean isPlaying = false;
+    private boolean isElected = false;
     
     private final Socket clientSocket;
     private int player_id;
@@ -221,50 +222,52 @@ public class Server extends Thread {
                         proposed_kpu_id.put(player_id, Integer.parseInt(jsonRecv.get("kpu_id").toString()));
                     }
                     send(clientSocket, temp);
-
-                    while (proposed_kpu_id.size() < player_count){
-                        // keep on waiting
-                        System.out.print("");
-                    }
-
-                    // every active palyer has proposed a leader
-                    // INCLUDING the proposers themselves
-                    if (proposed_kpu_id.size() == player_count){ 
-                        int kpu_id = players.size()-1;
-                        kpu_id = electedKPU();
-                        System.out.println("Elected KPU: " + kpu_id);
-                        temp.clear();
-                        temp.put("method", "kpu_selected");
-                        temp.put("kpu_id", kpu_id);
-                        send(clientSocket, temp);
-                        
-                        Object recv_status_kpu = listen(clientSocket);
-                        
-                        if(recv_status_kpu instanceof Boolean) {
-                            if(!((Boolean) recv_status_kpu)) break;
+                    
+                    if (!isElected){
+                        while (proposed_kpu_id.size() < player_count){
+                            // keep on waiting
+                            System.out.print("");
                         }
-                        
-                        jsonRecv = (JSONObject)recv_status_kpu;
-                        if(jsonRecv.get("status").equals("ok") && kpu_id !=-1) { // success
-                            voteNow("day", clientSocket);
-                            
-                            Object recv_status_vote = listen(clientSocket);
-                            
-                            if(recv_status_vote instanceof Boolean) {
-                                if(!((Boolean) recv_status_vote)) break;
+
+                        // every active palyer has proposed a leader
+                        // INCLUDING the proposers themselves
+                        if (proposed_kpu_id.size() == player_count){ 
+                            int kpu_id = players.size()-1;
+                            kpu_id = electedKPU();
+                            if (kpu_id != -1) isElected = true;
+                            System.out.println("Elected KPU: " + kpu_id);
+                            temp.clear();
+                            temp.put("method", "kpu_selected");
+                            temp.put("kpu_id", kpu_id);
+                            send(clientSocket, temp);
+
+                            Object recv_status_kpu = listen(clientSocket);
+
+                            if(recv_status_kpu instanceof Boolean) {
+                                if(!((Boolean) recv_status_kpu)) break;
                             }
-                            
-                            jsonRecv = (JSONObject)recv_status_vote;
-                            if(jsonRecv.get("status").equals("ok")) { 
-                                // success
+
+                            jsonRecv = (JSONObject)recv_status_kpu;
+                            if(jsonRecv.get("status").equals("ok") && kpu_id !=-1) { // success
+                                voteNow("day", clientSocket);
+
+                                Object recv_status_vote = listen(clientSocket);
+
+                                if(recv_status_vote instanceof Boolean) {
+                                    if(!((Boolean) recv_status_vote)) break;
+                                }
+
+                                jsonRecv = (JSONObject)recv_status_vote;
+                                if(jsonRecv.get("status").equals("ok")) { 
+                                    // success
+                                } else {
+                                    // TODO : vote now unsuccesful
+                                }
                             } else {
-                                // TODO : vote now unsuccesful
+                                // TODO: kpu selected unsuccessful
                             }
-                        } else {
-                            // TODO: kpu selected unsuccessful
                         }
                     }
-
                 } else if (jsonRecv.get("method").equals("vote_result_werewolf")) {
                     if (!isPlaying){
                         temp.put("status", "fail");
