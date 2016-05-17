@@ -208,6 +208,8 @@ public class Server extends Thread {
                         } else {
                             // TODO: vote now unsuccessful
                         }
+                    } else {
+                        isElected = false;
                     }
                 }
                 else if (jsonRecv.get("method").equals("accepted_proposal")){
@@ -543,7 +545,6 @@ public class Server extends Thread {
             isDay = true;
             day_vote = 0;
             temp.put("days", day);
-            isElected = false;
         } else {
             isDay = false;
             temp.put("days", day);
