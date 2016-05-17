@@ -163,6 +163,7 @@ public class Server extends Thread {
                         jsonRecv = (JSONObject)recv_status_start;
                         if(jsonRecv.get("status").equals("ok")) { // successfully start the game
                             // CHANGE PHASE
+                            day++;
                             changePhase("day", clientSocket);
                             Object status = (JSONObject)listen(clientSocket);
                             
@@ -285,6 +286,7 @@ public class Server extends Thread {
                         int killed = Integer.parseInt(jsonRecv.get("player_killed").toString());
                         killPlayer(killed);
                         
+                        day++; 
                         for (int i = 0; i < players.size(); i++){
                             if (getAliveWerewolfNumber() == 0){
                                 gameOver("civilian", client_socket.get(i));
@@ -540,7 +542,8 @@ public class Server extends Thread {
         if (d.equals("day")){
             isDay = true;
             day_vote = 0;
-            temp.put("days", ++day);
+            temp.put("days", day);
+            isElected = false;
         } else {
             isDay = false;
             temp.put("days", day);
